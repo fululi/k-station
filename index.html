@@ -103,10 +103,10 @@
   <summary>📖 图上标注都是啥意思（点我展开）</summary>
   <div class="icthelp-body">
     <b class="down">FVG支撑</b> / <b class="up">FVG压力</b>：三根蜡烛的跳空缺口，价格倾向回补；"·半补"=已补一半，剩一半悬着，缺口上下沿就是支撑/压力<br>
-    <b style="color:#ff9a5c">BSL 橙带</b>：前高点上方的<b>空头止损密集区</b>。主力要出货需要买盘接盘，常把价格拉到这里扫掉空头止损——所以它是"拉升目标位"，到了别追<br>
-    <b style="color:#3fd6c2">SSL 青带</b>：前低点下方的<b>多头止损密集区</b>。主力要进货需要卖盘，常砸到这里扫掉多头止损——所以它是"洗盘目标位"，砸到别怕<br>
-    <b style="color:#57a7ff">OB·进货区</b>（蓝块）：一波拉升前的最后一根阴线，主力建仓成本区，回踩到这里看支撑<br>
-    <b style="color:#ffd21f">OB·出货区</b>（黄块）：一波下跌前的最后一根阳线，主力派发区，反弹到这里看压力<br>
+    <b style="color:#ff9a5c">Buy Side Liquidity 橙带</b>：前高点上方的<b>空头止损密集区</b>。主力要出货需要买盘接盘，把价格拉上来逼空头止损（空头一止损就是买单）——主力借这波买单出货。所以它是"拉高出货目标位"，扫到这里别追，手里有货反而可以减<br>
+    <b style="color:#3fd6c2">Sell Side Liquidity 青带</b>：前低点下方的<b>多头止损密集区</b>。主力要进货需要卖盘，故意砸下来逼多头止损（多头一止损就是卖单）——主力借这波卖单吸筹，这就是"洗盘"，故意让你把筹码交出来。砸到这里别慌着割<br>
+    <b style="color:#ffd21f">OB·进货区</b>（黄块）：一波拉升前的最后一根阴线，主力建仓成本区 = <b>持仓/加仓参考区</b>，回踩到这里看支撑<br>
+    <b style="color:#ff8a80">OB·出货区</b>（浅红块）：一波下跌前的最后一根阳线，主力派发区 = <b>压力位</b>，反弹到这里看压力<br>
     <b class="flat">BOS↗/↘</b>：收盘顺势突破前高/前低 = 趋势延续，顺势单的加仓参考<br>
     <b style="color:#ff6fd8">CHoCH⚠</b>：收盘逆势跌破/突破结构 = 趋势可能反转的<b>预警</b>（不是确认），出现它要收紧止损
   </div>
@@ -1791,7 +1791,7 @@ function renderICT(ctx, v) {
       ctx.setLineDash([]);
       ctx.fillStyle = col; ctx.font = "8.5px -apple-system, sans-serif";
       ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      ctx.fillText(L.side + " " + L.p.toFixed(d2), x0 + 2, y - 2);
+      ctx.fillText((isB ? "Buy Side Liquidity " : "Sell Side Liquidity ") + L.p.toFixed(d2), x0 + 2, y - 2);
     });
   }
   if (S.ind.ms) {
@@ -1813,12 +1813,12 @@ function renderICT(ctx, v) {
       if (o.i < v.i0 - 10) return;
       var x0 = Math.max(v.padL, v.X(o.i));
       var yT = v.Y(o.top), yB = v.Y(o.bot);
-      ctx.fillStyle = o.bull ? "rgba(87,167,255,0.12)" : "rgba(255,210,31,0.10)";
+      ctx.fillStyle = o.bull ? "rgba(255,210,31,0.10)" : "rgba(255,111,102,0.10)";
       ctx.fillRect(x0, yT, right - x0, Math.max(1, yB - yT));
-      ctx.strokeStyle = o.bull ? "rgba(87,167,255,0.5)" : "rgba(255,210,31,0.45)";
+      ctx.strokeStyle = o.bull ? "rgba(255,210,31,0.5)" : "rgba(255,111,102,0.5)";
       ctx.lineWidth = 1;
       ctx.strokeRect(x0, yT, right - x0, Math.max(1, yB - yT));
-      ctx.fillStyle = o.bull ? "#57a7ff" : "#ffd21f";
+      ctx.fillStyle = o.bull ? "#ffd21f" : "#ff8a80";
       ctx.font = "8.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
       ctx.fillText(o.bull ? "OB·进货区" : "OB·出货区", x0 + 2, (yT + yB) / 2);
     });
