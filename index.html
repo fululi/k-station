@@ -1619,6 +1619,16 @@ function ictCalc(kl) {
     }
   }
   eq(sw.sh, 2, "BSL"); eq(sw.sl, 3, "SSL");
+  // 同侧相近价位的流动性线合并去重（保留摆动点最新的一条）
+  out.liq.sort(function (a, b) { return b.i - a.i; });
+  var lm = [];
+  out.liq.forEach(function (L) {
+    for (var q = 0; q < lm.length; q++) {
+      if (lm[q].side === L.side && Math.abs(lm[q].p - L.p) <= tol * 2) return;
+    }
+    lm.push(L);
+  });
+  out.liq = lm;
   // 结构：收盘突破最近摆动高/低 → BOS（顺势）/CHoCH（逆势反转），并标记订单块
   var trend = 0, lastSH = null, lastSL = null, lastBreak = -1;
   var all = [];
@@ -1983,6 +1993,13 @@ function renderMonitor(ctx, v) {
     if (z.bot > last) upG++; else if (z.top < last) dnG++;
   });
   if (upG || dnG) rows.push(["近60根有效缺口 · 上方 " + upG + " 个没补(压力) · 下方 " + dnG + " 个(支撑)", "#b78cff"]);
+  // 5b. 流动性目标（最近的上方BSL / 下方SSL）
+  var bsl = null, ssl = null;
+  ic2.liq.forEach(function (L) {
+    if (L.side === "BSL" && L.p > last && (!bsl || L.p < bsl)) bsl = L.p;
+    if (L.side === "SSL" && L.p < last && (!ssl || L.p > ssl)) ssl = L.p;
+  });
+  if (bsl || ssl) rows.push(["流动性 " + (bsl ? "上方BSL " + bsl.toFixed(dec()) + " +" + (bsl / last * 100 - 100).toFixed(1) + "%" : "") + (bsl && ssl ? " · " : "") + (ssl ? "下方SSL " + ssl.toFixed(dec()) + " -" + (100 - ssl / last * 100).toFixed(1) + "%" : ""), "#b78cff"]);
   // 6. 收敛三角形态（近50根摆动点：突破计入评分，末端未破只提示）
   var tr2 = triDetect(kl);
   if (tr2) {
