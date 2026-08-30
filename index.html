@@ -2036,7 +2036,7 @@ function renderMonitor(ctx, v) {
     if (z.i < n - 60 || z.top - z.bot < minH) return;
     if (z.bot > last) upG++; else if (z.top < last) dnG++;
   });
-  if (upG || dnG) rows.push(["近60根有效缺口 · 上方 " + upG + " 个没补(压力) · 下方 " + dnG + " 个(支撑)", "#b78cff"]);
+  if (upG || dnG) rows.push(["缺口(有回补倾向不保证) 上方" + upG + "个未补=回抽到这里看抛压·减仓参考 · 下方" + dnG + "个=回踩看承接·低吸参考", "#b78cff"]);
   // 5b. 流动性目标（最近的上方BSL / 下方SSL）
   var bsl = null, ssl = null;
   ic2.liq.forEach(function (L) {
