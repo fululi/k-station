@@ -196,6 +196,34 @@ function fetchFFlow(code, cb) {
     if (cb) cb(null);
   });
 }
+// 盘中分钟级资金流（东财）：f51时间 f52主力净流入/分钟(元) f56超大单 —— 实时主力曲线数据源
+function fetchFFlowMin(code, cb) {
+  var q = "secid=" + secidOf(code) + "&ut=" + UT + "&lmt=0&klt=1&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56";
+  function parse(d) {
+    if (!d || !d.data || !d.data.klines) return null;
+    var day = "";
+    var rows = [];
+    d.data.klines.forEach(function (row) {
+      var p = row.split(",");
+      if (p.length < 2) return;
+      var t = p[0];
+      if (!day) day = t.slice(0, 10);
+      if (t.slice(0, 10) !== day) return;
+      var main = parseFloat(p[1]), sup = parseFloat(p[5]);
+      rows.push({ t: t, main: isNaN(main) ? 0 : main, sup: isNaN(sup) ? 0 : sup });
+    });
+    return rows;
+  }
+  jsonp("https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?" + q, function (err, d) {
+    var rows = !err && parse(d);
+    if (rows) { S.rtflow = rows; if (cb) cb(null); return; }
+    jsonp("https://push2.eastmoney.com/api/qt/stock/fflow/kline/get?" + q, function (err2, d2) {
+      var rows2 = !err2 && parse(d2);
+      if (rows2) { S.rtflow = rows2; if (cb) cb(null); return; }
+      if (cb) cb(err2 || err || new Error("无盘中资金流"));
+    });
+  });
+}
 /* ================= 状态与持久化 ================= */
 var PERIODS = [["101", "日线"], ["102", "周线"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"]];
 var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5]];
@@ -205,8 +233,8 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: true, fvg: true, liq: true, ms: true, ob: true, ddx: true, zlyy: true, pdhl: true },
-  fflow: [], floatMV: 0
+  ind: { ma: true, fvg: true, liq: true, ms: true, ob: true, ddx: true, zlyy: true, pdhl: true, rtflow: true },
+  fflow: [], rtflow: [], floatMV: 0
 };
 var DRAW = {}; // "code:klt" -> [{type, pts:[{i,p}...]}]
 function store() {
@@ -221,7 +249,7 @@ function restore() {
     if (o.codes && o.codes.length) S.codes = o.codes;
     if (o.active) S.active = o.active;
     if (o.klt) S.klt = o.klt;
-    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.pdhl == null) S.ind.pdhl = true; }
+    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; }
     if (o.draw) DRAW = o.draw;
   } catch (e) {}
 }
@@ -267,8 +295,9 @@ function view() {
   var macdH = Math.round(avail * 0.13);
   var ddxH = S.ind.ddx ? Math.round(avail * 0.09) : 0;
   var zlyyH = S.ind.zlyy ? Math.round(avail * 0.09) : 0;
-  var subN = 2 + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0);
-  var priceH = avail - volH - macdH - ddxH - zlyyH - 6 * subN;
+  var rtH = S.ind.rtflow ? Math.round(avail * 0.10) : 0;
+  var subN = 2 + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0) + (rtH ? 1 : 0);
+  var priceH = avail - volH - macdH - ddxH - zlyyH - rtH - 6 * subN;
   if (!S.count) S.count = Math.max(30, Math.round(plotW / 6.5));
   S.count = Math.max(15, Math.min(250, S.count));
   var i1 = Math.max(Math.min(S.end || n, n), Math.min(S.count, n));
@@ -283,12 +312,14 @@ function view() {
   if (!(hi > lo)) { hi = lo + 1; }
   var step = plotW / (i1 - i0);
   var volY = padT + priceH + 6, macdY = volY + volH + 6;
-  var ddxY = macdY + macdH + 6;
+  var rtY = macdY + macdH + 6;
+  var ddxY = rtY + (rtH ? rtH + 6 : 0);
   var zlyyY = ddxY + (ddxH ? ddxH + 6 : 0);
-  var bottom = zlyyH ? zlyyY + zlyyH : (ddxH ? ddxY + ddxH : macdY + macdH);
+  var bottom = zlyyH ? zlyyY + zlyyH : (ddxH ? ddxY + ddxH : (rtH ? rtY + rtH : macdY + macdH));
   return {
     w: w, hh: hh, i0: i0, i1: i1, n: n, step: step, padL: padL, padR: padR, padT: padT,
     priceH: priceH, volY: volY, volH: volH, macdY: macdY, macdH: macdH, vMax: vMax,
+    rtY: rtY, rtH: rtH,
     ddxY: ddxY, ddxH: ddxH, zlyyY: zlyyY, zlyyH: zlyyH, bottom: bottom,
     X: function (i) { return padL + (i - i0 + 0.5) * step; },
     I: function (x) { return Math.max(0, Math.min(n - 1, Math.round(i0 + (x - padL) / step - 0.5))); },
@@ -592,6 +623,7 @@ function draw() {
   // ICT 叠加层 + DDX≈/主力意愿≈ 副图
   renderICT(ctx, v);
   renderDailyLevels(ctx, v);
+  renderRtflow(ctx, v);
   renderExtraPanes(ctx, v);
   // 画线层
   renderDrawings(ctx, v);
@@ -1033,6 +1065,7 @@ function loadAll(reset) {
     }
   });
   fetchFFlow(S.active, function () { draw(); });
+  if (S.ind.rtflow) fetchFFlowMin(S.active, function () { draw(); });
 }
 function inSession() {
   var d = new Date(), wd = d.getDay();
@@ -1062,6 +1095,7 @@ setInterval(function () {
     draw();
   });
   if (S.klt === "101") fetchFFlow(S.active, function () { draw(); });
+  if (S.ind.rtflow) fetchFFlowMin(S.active, function () { draw(); });
 }, inSession() ? 60000 : 300000);
 window.addEventListener("resize", draw);
 /* ================= ICT 叠加（FVG / 流动性BSL·SSL / 结构BOS·CHoCH / 订单块，简化口径） ================= */
@@ -1246,6 +1280,77 @@ function renderDailyLevels(ctx, v) {
   lv(today.hi, "rgba(255,111,102,0.75)", [2, 3], pre2 + "高");
   lv(today.lo, "rgba(53,217,154,0.75)", [2, 3], pre2 + "低");
 }
+/* ================= 盘中实时主力资金流（分钟级累计净额曲线，东财口径：主力=超大单+大单） ================= */
+function renderRtflow(ctx, v) {
+  if (!S.ind.rtflow) return;
+  var y = v.rtY, h = v.rtH;
+  var right = v.padL + (v.i1 - v.i0) * v.step;
+  ctx.strokeStyle = GRID; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(v.padL, y); ctx.lineTo(right, y); ctx.stroke();
+  ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("主力资金·今日累计（金=主力 橙=超大单）", v.padL + 4, y + 9);
+  if (!S.rtflow.length) {
+    ctx.fillStyle = DIM; ctx.font = "10px -apple-system, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("非交易时段 / 加载中 · 盘中 60 秒自动刷新", v.padL + (right - v.padL) / 2, y + h / 2);
+    return;
+  }
+  // 时间 → 会话分钟槽位：09:30-11:30 = 0-119，13:00-15:00 = 120-239
+  function slot(t) {
+    var hm = t.slice(11, 16);
+    var hh2 = +hm.slice(0, 2), mm = +hm.slice(3, 5);
+    var m = hh2 * 60 + mm;
+    if (m < 570 || m > 900) return -1;
+    return m <= 690 ? m - 570 : 120 + (m - 780);
+  }
+  var cum = [], cumS = [], s = 0, s2 = 0;
+  for (var i = 0; i < S.rtflow.length; i++) {
+    var sl = slot(S.rtflow[i].t);
+    if (sl < 0) continue;
+    s += S.rtflow[i].main; s2 += S.rtflow[i].sup;
+    cum[sl] = s; cumS[sl] = s2;
+  }
+  // 前向填充，保证曲线连续
+  var last = -1, lv = 0, lv2 = 0;
+  for (i = 0; i < 240; i++) {
+    if (cum[i] != null) { lv = cum[i]; lv2 = cumS[i]; last = i; }
+    else if (last >= 0) { cum[i] = lv; cumS[i] = lv2; }
+  }
+  if (last < 0) return;
+  var abs = 1e-9;
+  for (i = 0; i <= last; i++) { abs = Math.max(abs, Math.abs(cum[i]), Math.abs(cumS[i])); }
+  var ZY = function (val) { return y + h / 2 - val / abs * (h / 2 - 10); };
+  var XX = function (sl2) { return v.padL + (sl2 + 0.5) / 240 * (right - v.padL); };
+  // 零轴
+  ctx.strokeStyle = "rgba(150,180,166,0.7)";
+  ctx.beginPath(); ctx.moveTo(v.padL, ZY(0)); ctx.lineTo(right, ZY(0)); ctx.stroke();
+  // 时间刻度
+  ctx.fillStyle = DIM; ctx.font = "8.5px Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  [["09:30", 0], ["10:30", 60], ["11:30/13:00", 120], ["14:00", 180], ["15:00", 239]].forEach(function (tk) {
+    ctx.fillText(tk[0], XX(tk[1]), y + h - 9);
+  });
+  // 主力累计曲线 + 零轴间面积填充
+  ctx.beginPath();
+  ctx.moveTo(XX(0), ZY(cum[0]));
+  for (i = 1; i <= last; i++) ctx.lineTo(XX(i), ZY(cum[i]));
+  ctx.strokeStyle = "#e6b43c"; ctx.lineWidth = 1.4; ctx.stroke();
+  ctx.lineTo(XX(last), ZY(0)); ctx.lineTo(XX(0), ZY(0)); ctx.closePath();
+  var cur = cum[last];
+  ctx.fillStyle = cur >= 0 ? "rgba(255,111,102,0.12)" : "rgba(53,217,154,0.12)";
+  ctx.fill();
+  // 超大单累计曲线
+  ctx.beginPath();
+  ctx.moveTo(XX(0), ZY(cumS[0]));
+  for (i = 1; i <= last; i++) ctx.lineTo(XX(i), ZY(cumS[i]));
+  ctx.strokeStyle = "#ff9a5c"; ctx.lineWidth = 1.1; ctx.stroke();
+  // 右侧读数
+  function wan(val) { var w2 = val / 1e4; return (w2 >= 0 ? "+" : "") + (Math.abs(w2) >= 10000 ? (w2 / 10000).toFixed(2) + "亿" : Math.round(w2) + "万"); }
+  ctx.font = "9px Menlo, monospace"; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = cur >= 0 ? UP : DN;
+  ctx.fillText("主力 " + wan(cur), right - 4, y + 9);
+  ctx.fillStyle = "#ff9a5c";
+  ctx.fillText("超大 " + wan(cumS[last]), right - 4, y + 20);
+}
 /* ================= DDX≈ / 主力意愿≈ 副图（与桌面端同口径：东财日级资金流推算） ================= */
 function renderExtraPanes(ctx, v) {
   if (!S.ind.ddx && !S.ind.zlyy) return;
@@ -1351,7 +1456,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "均线"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["ddx", "DDX≈"], ["zlyy", "主力意愿≈"]];
+var INDS = [["ma", "均线"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["rtflow", "实时主力"], ["ddx", "DDX≈"], ["zlyy", "主力意愿≈"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
@@ -1364,6 +1469,7 @@ function buildInds() {
       S.ind[t[0]] = !S.ind[t[0]];
       store(); buildInds(); draw();
       if ((t[0] === "ddx" || t[0] === "zlyy") && S.ind[t[0]] && !S.fflow.length) fetchFFlow(S.active, function () { draw(); });
+      if (t[0] === "rtflow" && S.ind.rtflow && !S.rtflow.length) fetchFFlowMin(S.active, function () { draw(); });
     });
     el.appendChild(b);
   });
