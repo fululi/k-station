@@ -299,7 +299,7 @@ function fetchFFlowMin(code, cb) {
 }
 /* ================= 状态与持久化 ================= */
 var PERIODS = [["101", "日线"], ["5D", "5日"], ["102", "周线"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"]];
-var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5], ["freedraw", "画笔", 2], ["lrchan", "画回归", 2], ["buy", "买点线", 1]];
+var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5], ["freedraw", "画笔", 2], ["lrchan", "画回归", 2], ["buy", "买点线", 1], ["priceline", "价线", 0]];
 var S = {
   codes: [["600105", "永鼎股份"], ["600176", "中国巨石"], ["515880", "通信ETF"]],
   active: "600105", klt: "101",
@@ -1429,6 +1429,16 @@ function buildTools() {
     b.setAttribute("data-tool", t[0]);
     b.addEventListener("click", function () {
       if (S.tool === t[0]) { S.tool = null; S.pending = []; S.ghost = null; hint(""); }
+      else if (t[2] === 0) {
+        var pr = prompt("输入价格（如 44.2）");
+        var pv2 = parseFloat(pr);
+        if (pr != null && pv2 > 0 && S.kl.length) {
+          dlist().push({ type: "hline", pts: [{ d: S.kl[S.kl.length - 1][0], p: pv2 }] });
+          S.selected = dlist().length - 1;
+          store(); hint("已加价格线 " + fwp(pv2) + " · 长按可拖动 · 「删选」删除");
+        } else if (pr != null) hint("价格无效");
+        S.tool = null;
+      }
       else {
         S.tool = t[0]; S.pending = []; S.selected = -1;
         hint("「" + t[1] + "」已激活 · 在K线上依次点 " + t[2] + " 个点");
@@ -1583,6 +1593,17 @@ function ictCalc(kl) {
       if (remB < top2) out.fvg.push({ i: i, top: top2, bot: remB, bull: false, part: remB > bot2 });
     }
   }
+  // 相邻同向、区间重叠/相接(±0.3%)的 FVG 合并成一块，减少碎块
+  out.fvg.sort(function (a, b) { return a.i - b.i; });
+  var mg = [], tolM = kl[n - 1][4] * 0.003;
+  out.fvg.forEach(function (z) {
+    var L = mg[mg.length - 1];
+    if (L && L.bull === z.bull && z.bot <= L.top + tolM && z.top >= L.bot - tolM) {
+      L.top = Math.max(L.top, z.top); L.bot = Math.min(L.bot, z.bot);
+      L.part = L.part || z.part;
+    } else mg.push({ i: z.i, top: z.top, bot: z.bot, bull: z.bull, part: z.part });
+  });
+  out.fvg = mg;
   var sw = swingsOf(kl);
   var tol = kl[n - 1][4] * 0.002;
   // 流动性：近120根内等高(BSL)/等低(SSL)摆动点
