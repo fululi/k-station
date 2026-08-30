@@ -386,6 +386,10 @@ function view() {
   var ddxH = 0;
   var zlyyH = S.ind.zlyy && !noFund(S.active) ? Math.round(avail * 0.09) : 0;
   var rtH = S.ind.rtflow && !noFund(S.active) ? Math.round(avail * 0.10) : 0;
+  if (S.bigPane === "vol") volH = Math.round(avail * 0.32);
+  else if (S.bigPane === "macd") macdH = Math.round(avail * 0.32);
+  else if (S.bigPane === "zlyy" && zlyyH) zlyyH = Math.round(avail * 0.32);
+  else if (S.bigPane === "rt" && rtH) rtH = Math.round(avail * 0.32);
   var subN = 2 + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0) + (rtH ? 1 : 0);
   var priceH = avail - volH - macdH - ddxH - zlyyH - rtH - 6 * subN;
   if (!S.count) S.count = S.klt === "5D" ? 240 : Math.max(30, Math.round(plotW / 6.5));
@@ -426,6 +430,22 @@ function view() {
   };
 }
 
+/* ---- 副图双击放大：判断点击落在哪个副图 ---- */
+function paneAt(v, y) {
+  if (!v) return null;
+  if (y >= v.volY && y <= v.volY + v.volH) return "vol";
+  if (y >= v.macdY && y <= v.macdY + v.macdH) return "macd";
+  if (v.rtH && y >= v.rtY && y <= v.rtY + v.rtH) return "rt";
+  if (v.zlyyH && y >= v.zlyyY && y <= v.zlyyY + v.zlyyH) return "zlyy";
+  return null;
+}
+function togglePane(p2) {
+  if (!p2) return false;
+  S.bigPane = S.bigPane === p2 ? null : p2;
+  hint(S.bigPane ? "副图已放大 · 再双击该图恢复" : "副图已恢复");
+  draw();
+  return true;
+}
 /* ---- 画线锚点：{d: 日期串, p: 价格}，渲染时按日期解析到 bar 下标（换数据不漂移） ---- */
 function idxMap(v) {
   var m = {};
@@ -1134,6 +1154,12 @@ cv.addEventListener("touchend", function (e) {
     if (S.monRect && T.x0 >= S.monRect.x && T.x0 <= S.monRect.x + S.monRect.w && T.y0 >= S.monRect.y && T.y0 <= S.monRect.y + S.monRect.h) {
       S.monOpen = !S.monOpen; store(); draw(); T = null; return;
     }
+    var now2 = Date.now();
+    var lt = S.lastTap;
+    S.lastTap = { t: now2, x: T.x0, y: T.y0 };
+    if (lt && now2 - lt.t < 350 && Math.abs(lt.x - T.x0) < 40 && Math.abs(lt.y - T.y0) < 40) {
+      if (togglePane(paneAt(view(), T.y0))) { T = null; return; }
+    }
     var hit = hitTest({ x: T.x0, y: T.y0 });
     S.selected = hit;
     hint(hit >= 0 ? "已选中画线 · 点「删选」删除" : "");
@@ -1257,7 +1283,8 @@ cv.addEventListener("wheel", function (e) {
 }, { passive: false });
 cv.addEventListener("dblclick", function (e) {
   var pt = posT(e);
-  if (pt.x > cv.clientWidth - 50) { S.yZoom = 1; S.yOff = 0; hint("价格轴缩放/位移已复位"); draw(); }
+  if (pt.x > cv.clientWidth - 50) { S.yZoom = 1; S.yOff = 0; hint("价格轴缩放/位移已复位"); draw(); return; }
+  togglePane(paneAt(view(), pt.y));
 });
 cv.addEventListener("mouseleave", function () {
   if (!M && !S.tool && S.cross) { S.cross = null; draw(); }
@@ -1905,6 +1932,13 @@ function renderMonitor(ctx, v) {
     if (z.bot > last) upG++; else if (z.top < last) dnG++;
   });
   if (upG || dnG) rows.push(["近60根有效缺口 · 上方 " + upG + " 个没补(压力) · 下方 " + dnG + " 个(支撑)", "#b78cff"]);
+  // 6. 收敛三角形态（近50根摆动点：突破计入评分，末端未破只提示）
+  var tr2 = triDetect(kl);
+  if (tr2) {
+    if (tr2.brk > 0) { total++; score++; rows.push(["▲ 三角向上突破 · 做多信号", UP]); }
+    else if (tr2.brk < 0) { total++; rows.push(["▼ 三角向下跌破 · 空头信号", DN]); }
+    else rows.push(["收敛三角末端 · 等突破方向", "#b78cff"]);
+  }
   // 综合评分
   var verdict = score >= total - 0.5 ? "偏多" : (score <= 1 ? "偏空" : "震荡");
   var vc = verdict === "偏多" ? UP : (verdict === "偏空" ? DN : "#d9b45c");
