@@ -299,14 +299,14 @@ function fetchFFlowMin(code, cb) {
 }
 /* ================= 状态与持久化 ================= */
 var PERIODS = [["101", "日线"], ["5D", "5日"], ["102", "周线"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"]];
-var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5], ["freedraw", "画笔", 2], ["lrchan", "画回归", 2]];
+var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5], ["freedraw", "画笔", 2], ["lrchan", "画回归", 2], ["buy", "买点线", 1]];
 var S = {
   codes: [["600105", "永鼎股份"], ["600176", "中国巨石"], ["515880", "通信ETF"]],
   active: "600105", klt: "101",
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: true, tsline: true, lr: true, fvg: true, liq: true, ms: true, ob: true, ddx: false, zlyy: true, pdhl: true, tdhl: true, rtflow: true, boll: true, monitor: true },
+  ind: { ma: true, tsline: true, lr: "view", fvg: true, liq: true, ms: true, ob: true, ddx: false, zlyy: true, pdhl: true, tdhl: true, rtflow: true, boll: true, monitor: true, solid: false, atri: true },
   fflow: [], rtflow: [], floatMV: 0,
   lineMode: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false
 };
@@ -323,7 +323,7 @@ function restore() {
     if (o.codes && o.codes.length) S.codes = o.codes;
     if (o.active) S.active = o.active;
     if (o.klt) S.klt = o.klt;
-    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.lr == null) S.ind.lr = true; if (S.ind.ddx == null) S.ind.ddx = false; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; }
+    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.lr == null || S.ind.lr === true) S.ind.lr = "view"; if (S.ind.solid == null) S.ind.solid = false; if (S.ind.atri == null) S.ind.atri = true; if (S.ind.ddx == null) S.ind.ddx = false; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; }
     if (o.lineMode != null) S.lineMode = !!o.lineMode;
     if (o.pdhlMode) S.pdhlMode = o.pdhlMode;
     if (o.monOpen != null) S.monOpen = !!o.monOpen;
@@ -460,7 +460,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
   ctx.font = "10px -apple-system, sans-serif";
   ctx.textAlign = "left"; ctx.textBaseline = "middle";
   var t = dg.type;
-  var MINP = { trend: 2, hline: 1, ray: 2, rect: 2, fib: 2, pct: 2, tri: 3, xabcd: 5, freedraw: 2, lrchan: 2 };
+  var MINP = { trend: 2, hline: 1, ray: 2, rect: 2, fib: 2, pct: 2, tri: 3, xabcd: 5, freedraw: 2, lrchan: 2, buy: 1 };
   if (pts.length < (MINP[t] || 2)) {
     // 进行中的多点画线：只画已落锚点之间的预览连线和点
     ctx.strokeStyle = sel ? SEL : "#e6b43c";
@@ -487,7 +487,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
       for (ri = iA; ri <= iB; ri++) { var dv3 = S.kl[ri][4] - (ic3 + sl3 * (ri - iA)); sd3 += dv3 * dv3; }
       sd3 = Math.sqrt(sd3 / nn);
       var pxP3 = v.priceH / (v.hi - v.lo);
-      [["rgba(232,242,234,0.85)", 0, []], ["rgba(255,111,102,0.85)", 2, [5, 4]], ["rgba(53,217,154,0.85)", -2, [5, 4]]].forEach(function (L5) {
+      [["rgba(232,242,234,0.85)", 0, []], ["rgba(255,111,102,0.85)", 2, S.ind.solid ? [] : [5, 4]], ["rgba(53,217,154,0.85)", -2, S.ind.solid ? [] : [5, 4]]].forEach(function (L5) {
         ctx.strokeStyle = sel ? SEL : L5[0]; ctx.lineWidth = sel ? 2 : 1.2; ctx.setLineDash(L5[2]);
         ctx.beginPath();
         ctx.moveTo(v.X(iA), v.Y(ic3) - L5[1] * sd3 * pxP3);
@@ -503,9 +503,11 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     var yEnd = pts[0].y + dy / dx * (right + 80 - pts[0].x);
     drawSeg(ctx, pts[0], { x: right + 80, y: yEnd });
   }
-  else if (t === "hline") {
+  else if (t === "hline" || t === "buy") {
+    if (t === "buy") { ctx.strokeStyle = sel ? SEL : "#ffd21f"; ctx.lineWidth = sel ? 2.4 : 1.8; }
     ctx.beginPath(); ctx.moveTo(v.padL, pts[0].y); ctx.lineTo(right, pts[0].y); ctx.stroke();
-    ctx.fillText(fwp(dg.pts[0].p), right - 52, pts[0].y - 7);
+    ctx.fillStyle = t === "buy" ? (sel ? SEL : "#ffd21f") : ctx.fillStyle;
+    ctx.fillText((t === "buy" ? "买 " : "") + fwp(dg.pts[0].p), right - 52, pts[0].y - 7);
   }
   else if (t === "rect") {
     var x0 = Math.min(pts[0].x, pts[1].x), x1 = Math.max(pts[0].x, pts[1].x);
@@ -718,31 +720,32 @@ function draw() {
       ctx.fillText(bt, v.padL + 4, v.padT + 33);
     }
   }
-  // 线性回归通道（可视区收盘价回归：白=中轨 红=+2σ 绿=-2σ，上红下绿）
+  // 线性回归通道（白=中轨 红=+2σ 绿=-2σ；按钮循环 可视区→近60→关）
   if (S.ind.lr) {
-    var nL = i1 - i0;
+    var ri0 = S.ind.lr === "60" ? Math.max(0, i1 - 60) : i0;
+    var nL = i1 - ri0;
     if (nL >= 20) {
       var sxL = 0, syL = 0, sxyL = 0, sxxL = 0;
-      for (var li5 = i0; li5 < i1; li5++) {
-        var xvL = li5 - i0, yvL = kl[li5][4];
+      for (var li5 = ri0; li5 < i1; li5++) {
+        var xvL = li5 - ri0, yvL = kl[li5][4];
         sxL += xvL; syL += yvL; sxyL += xvL * yvL; sxxL += xvL * xvL;
       }
       var slL = (nL * sxyL - sxL * syL) / (nL * sxxL - sxL * sxL);
       var icL = (syL - slL * sxL) / nL;
       var sdL = 0;
-      for (li5 = i0; li5 < i1; li5++) { var dvL = kl[li5][4] - (icL + slL * (li5 - i0)); sdL += dvL * dvL; }
+      for (li5 = ri0; li5 < i1; li5++) { var dvL = kl[li5][4] - (icL + slL * (li5 - ri0)); sdL += dvL * dvL; }
       sdL = Math.sqrt(sdL / nL);
       var pxP = v.priceH / (v.hi - v.lo);
-      [["rgba(232,242,234,0.75)", 0, []], ["rgba(255,111,102,0.8)", 2, [5, 4]], ["rgba(53,217,154,0.8)", -2, [5, 4]]].forEach(function (L4) {
+      [["rgba(232,242,234,0.75)", 0, []], ["rgba(255,111,102,0.8)", 2, S.ind.solid ? [] : [5, 4]], ["rgba(53,217,154,0.8)", -2, S.ind.solid ? [] : [5, 4]]].forEach(function (L4) {
         ctx.strokeStyle = L4[0]; ctx.lineWidth = 1.1; ctx.setLineDash(L4[2]);
         ctx.beginPath();
-        ctx.moveTo(v.X(i0), v.Y(icL) - L4[1] * sdL * pxP);
+        ctx.moveTo(v.X(ri0), v.Y(icL) - L4[1] * sdL * pxP);
         ctx.lineTo(v.X(i1 - 1), v.Y(icL + slL * (nL - 1)) - L4[1] * sdL * pxP);
         ctx.stroke();
         ctx.setLineDash([]);
       });
       ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText("LR±2σ", v.padL + 4, v.padT + 21);
+      ctx.fillText(S.ind.lr === "60" ? "LR60±2σ" : "LR±2σ", v.padL + 4, v.padT + 21);
     }
   }
   // 均线（可在指标行关闭）
@@ -841,6 +844,7 @@ function draw() {
   ctx.save();
   ctx.beginPath(); ctx.rect(0, v.padT - 2, w, v.priceH + 4); ctx.clip();
   renderICT(ctx, v);
+  renderAutoTri(ctx, v);
   renderDailyLevels(ctx, v);
   renderMonitor(ctx, v);
   renderDrawings(ctx, v);
@@ -907,7 +911,7 @@ function hitTest(pt) {
       var yE = pts[0].y + dy / dx * (right + 80 - pts[0].x);
       d = distSeg(pt.x, pt.y, pts[0], { x: right + 80, y: yE });
     }
-    else if (t === "hline") d = Math.abs(pt.y - pts[0].y);
+    else if (t === "hline" || t === "buy") d = Math.abs(pt.y - pts[0].y);
     else if (t === "rect") {
       var xa = { x: Math.min(pts[0].x, pts[1].x) }, xb = { x: Math.max(pts[0].x, pts[1].x) };
       var ya = Math.min(pts[0].y, pts[1].y), yb = Math.max(pts[0].y, pts[1].y);
@@ -1574,6 +1578,54 @@ function ictCalc(kl) {
   out.liq = out.liq.slice(-4);
   return out;
 }
+function triDetect(kl) {
+  var n = kl.length;
+  var sw = swingsOf(kl);
+  var sh = [], sl = [];
+  for (var i = 0; i < sw.sh.length; i++) if (sw.sh[i] >= n - 50) sh.push(sw.sh[i]);
+  for (i = 0; i < sw.sl.length; i++) if (sw.sl[i] >= n - 50) sl.push(sw.sl[i]);
+  if (sh.length < 2 || sl.length < 2) return null;
+  var h1 = sh[sh.length - 2], h2 = sh[sh.length - 1];
+  var l1 = sl[sl.length - 2], l2 = sl[sl.length - 1];
+  if (h2 <= h1 || l2 <= l1) return null;
+  var mh = (kl[h2][2] - kl[h1][2]) / (h2 - h1);
+  var ml = (kl[l2][3] - kl[l1][3]) / (l2 - l1);
+  if (mh >= 0 || ml <= 0) return null;
+  var bh = kl[h1][2] - mh * h1, bl = kl[l1][3] - ml * l1;
+  var apex = (bl - bh) / (mh - ml);
+  if (apex <= Math.max(h2, l2) || apex > n + 30) return null;
+  var last = n - 1;
+  var brk = kl[last][4] > mh * last + bh ? 1 : (kl[last][4] < ml * last + bl ? -1 : 0);
+  return { h1: h1, h2: h2, l1: l1, l2: l2, mh: mh, bh: bh, ml: ml, bl: bl, apex: apex, brk: brk };
+}
+function renderAutoTri(ctx, v) {
+  if (!S.ind.atri) return;
+  var kl = S.kl, n = kl.length;
+  if (n < 40) return;
+  var tr = triDetect(kl);
+  if (!tr) return;
+  var xA = v.X(Math.min(tr.apex, n + 25));
+  var yHu = v.Y(tr.mh * tr.apex + tr.bh);
+  ctx.fillStyle = "rgba(183,140,255,0.06)";
+  ctx.beginPath();
+  ctx.moveTo(v.X(tr.h1), v.Y(tr.mh * tr.h1 + tr.bh));
+  ctx.lineTo(xA, yHu);
+  ctx.lineTo(v.X(tr.l1), v.Y(tr.ml * tr.l1 + tr.bl));
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "#b78cff"; ctx.lineWidth = 1.2;
+  ctx.setLineDash(S.ind.solid ? [] : [6, 4]);
+  ctx.beginPath(); ctx.moveTo(v.X(tr.h1), v.Y(tr.mh * tr.h1 + tr.bh)); ctx.lineTo(xA, yHu); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(v.X(tr.l1), v.Y(tr.ml * tr.l1 + tr.bl)); ctx.lineTo(xA, v.Y(tr.ml * tr.apex + tr.bl)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = "9.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+  if (tr.brk) {
+    ctx.fillStyle = tr.brk > 0 ? UP : DN;
+    ctx.fillText(tr.brk > 0 ? "▲ 三角突破" : "▼ 三角跌破", v.X(n - 1) - 62, v.Y(kl[n - 1][4]) - 5);
+  } else {
+    ctx.fillStyle = "#b78cff";
+    ctx.fillText("收敛三角", v.X(tr.h2) + 3, v.Y(tr.mh * tr.h2 + tr.bh) - 2);
+  }
+}
 function renderICT(ctx, v) {
   if (!S.ind.fvg && !S.ind.liq && !S.ind.ms && !S.ind.ob) return;
   var kl = S.kl, n = kl.length;
@@ -1678,12 +1730,14 @@ function renderDailyLevels(ctx, v) {
     labels.push({ y: y, t: lbl + " " + p.toFixed(d2), c: col });
   }
   if (S.ind.pdhl) {
-    lv(prev.hi, "#ffb14d", [5, 4], pre + "高");
-    lv(prev.lo, "#4de3c2", [5, 4], pre + "低");
+    lv(prev.hi, "#ffb14d", S.ind.solid ? [] : [5, 4], pre + "高");
+    lv(prev.lo, "#4de3c2", S.ind.solid ? [] : [5, 4], pre + "低");
   }
   if (S.ind.tdhl) {
+    lv(today.o, "rgba(228,237,230,0.55)", S.ind.solid ? [] : [3, 3], "今开");
     lv(today.hi, "#ff5252", [], pre2 + "高", 1.6);
     lv(today.lo, "#2ee68a", [], pre2 + "低", 1.6);
+    lv(today.c, "#e8f2ea", [], "最新", 1.4);
   }
   labels.sort(function (a, b) { return a.y - b.y; });
   for (var li3 = 1; li3 < labels.length; li3++) {
@@ -1928,7 +1982,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "均线"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["tdhl", "今高低"], ["monitor", "监测"], ["rtflow", "实时主力"], ["zlyy", "主力净额"]];
+var INDS = [["ma", "均线"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
@@ -1948,6 +2002,15 @@ function buildInds() {
     var b = document.createElement("button");
     b.className = "btn tabbtn" + (S.ind[t[0]] ? " on" : "");
     b.type = "button"; b.textContent = t[1];
+    if (t[0] === "lr") {
+      b.textContent = S.ind.lr === "60" ? "回归·60" : "回归通道";
+      b.addEventListener("click", function () {
+        S.ind.lr = S.ind.lr === "view" ? "60" : (S.ind.lr === "60" ? false : "view");
+        store(); buildInds(); draw();
+      });
+      el.appendChild(b);
+      return;
+    }
     b.addEventListener("click", function () {
       S.ind[t[0]] = !S.ind[t[0]];
       store(); buildInds(); draw();
