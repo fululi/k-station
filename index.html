@@ -306,14 +306,15 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: true, tsline: true, lr: "view", fvg: true, liq: true, ms: true, ob: true, ddx: false, zlyy: true, pdhl: true, tdhl: true, rtflow: true, boll: true, monitor: true, solid: false, atri: true },
+  ind: { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: true, boll: false, monitor: true, solid: false, atri: true },
+  triScan: null,
   fflow: [], rtflow: [], floatMV: 0,
   lineMode: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false
 };
 var DRAW = {}; // "code:klt" -> [{type, pts:[{i,p}...]}]
 function store() {
   try {
-    localStorage.setItem("ksm_v1", JSON.stringify({ codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed }));
+    localStorage.setItem("ksm_v1", JSON.stringify({ v: 3, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed }));
   } catch (e) {}
 }
 function restore() {
@@ -329,6 +330,7 @@ function restore() {
     if (o.monOpen != null) S.monOpen = !!o.monOpen;
     if (o.draw) DRAW = o.draw;
     if (o.collapsed != null) S.collapsed = !!o.collapsed;
+    if (o.v !== 3) S.ind = { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: true, boll: false, monitor: true, solid: false, atri: true };
   } catch (e) {}
 }
 function dkey() { return S.active + ":" + S.klt; }
@@ -347,6 +349,15 @@ function maArr(kl, n) {
     s += kl[i][4];
     if (i >= n) s -= kl[i - n][4];
     if (i >= n - 1) out[i] = s / n;
+  }
+  return out;
+}
+function emaArr(kl, n) {
+  var out = new Array(kl.length).fill(null), k2 = 2 / (n + 1), e = null;
+  for (var i = 0; i < kl.length; i++) {
+    var c = kl[i][4];
+    e = e == null ? c : e * (1 - k2) + c * k2;
+    if (i >= n - 1) out[i] = e;
   }
   return out;
 }
@@ -430,6 +441,24 @@ function view() {
   };
 }
 
+/* ---- 多周期三角扫描：后台拉 周/日/60/30/15/5 分数据，逐个跑 triDetect（换标的/周期/手动刷新时触发） ---- */
+function triScanAll() {
+  var code = S.active, cur = S.klt === "5D" ? "5" : S.klt;
+  var scan = { code: code, res: {} };
+  S.triScan = scan;
+  var list = [["102", "周"], ["101", "日"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"]];
+  list.forEach(function (it) {
+    if (it[0] === cur) return;
+    fetchKline(code, it[0], function (err, kl) {
+      if (S.triScan !== scan) return;
+      if (!err && kl && kl.length >= 20) {
+        var tr = triDetect(kl);
+        scan.res[it[1]] = tr ? tr.brk : null;
+      } else scan.res[it[1]] = null;
+      draw();
+    });
+  });
+}
 /* ---- 副图双击放大：判断点击落在哪个副图 ---- */
 function paneAt(v, y) {
   if (!v) return null;
@@ -770,10 +799,10 @@ function draw() {
   }
   // 均线（可在指标行关闭）
   if (S.ind.ma) {
-    var mas = [[5, "#f5f6fa"], [10, "#ffd21f"], [20, "#b78cff"], [60, "#57a7ff"]];
+    var mas = [[5, "#f5f6fa"], [10, "#ffd21f"], [20, "#b78cff"]];
     ctx.lineWidth = 1.2;
     mas.forEach(function (m2) {
-      var arr = maArr(kl, m2[0]);
+      var arr = emaArr(kl, m2[0]);
       ctx.strokeStyle = m2[1];
       ctx.beginPath();
       var started = false;
@@ -788,9 +817,9 @@ function draw() {
     ctx.textAlign = "left"; ctx.font = "9.5px Menlo, monospace";
     var lx = v.padL + 4, last = i1 - 1;
     mas.forEach(function (m2) {
-      var arr = maArr(kl, m2[0]);
+      var arr = emaArr(kl, m2[0]);
       if (arr[last] == null) return;
-      var t = "MA" + m2[0] + " " + arr[last].toFixed(d2);
+      var t = "EMA" + m2[0] + " " + arr[last].toFixed(d2);
       ctx.fillStyle = m2[1];
       ctx.fillText(t, lx, v.padT + 7);
       lx += ctx.measureText(t).width + 8;
@@ -1050,7 +1079,7 @@ cv.addEventListener("touchstart", function (e) {
   }
   if (S.tool) { placeAnchor(pt); T = { mode: "draw" }; return; }
   // 右侧价格轴：上下拖动 = 纵向缩放（不影响画图和平移）
-  if (pt.x > cv.clientWidth - 50) { T = { mode: "yzoom", ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
+  if (pt.x > cv.clientWidth - 64) { T = { mode: "yzoom", ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
   var hit0 = hitTest(pt);
   if (hit0 >= 0) {
     S.selected = hit0;
@@ -1181,7 +1210,7 @@ cv.addEventListener("mousedown", function (e) {
     return;
   }
   if (S.tool) { placeAnchor(pt); return; }
-  if (pt.x > cv.clientWidth - 50) { M = { yzoom: true, ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
+  if (pt.x > cv.clientWidth - 64) { M = { yzoom: true, ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
   var hit0 = hitTest(pt);
   if (hit0 >= 0) {
     S.selected = hit0;
@@ -1283,7 +1312,7 @@ cv.addEventListener("wheel", function (e) {
 }, { passive: false });
 cv.addEventListener("dblclick", function (e) {
   var pt = posT(e);
-  if (pt.x > cv.clientWidth - 50) { S.yZoom = 1; S.yOff = 0; hint("价格轴缩放/位移已复位"); draw(); return; }
+  if (pt.x > cv.clientWidth - 64) { S.yZoom = 1; S.yOff = 0; hint("价格轴缩放/位移已复位"); draw(); return; }
   togglePane(paneAt(view(), pt.y));
 });
 cv.addEventListener("mouseleave", function () {
@@ -1464,6 +1493,7 @@ function loadAll(reset) {
     hint("");
     setFresh(true);
     syncTop(); draw();
+    triScanAll();
   });
   fetchQuote(S.active, function (err, q) {
     if (!err && q) {
@@ -1939,6 +1969,17 @@ function renderMonitor(ctx, v) {
     else if (tr2.brk < 0) { total++; rows.push(["▼ 三角向下跌破 · 空头信号", DN]); }
     else rows.push(["收敛三角末端 · 等突破方向", "#b78cff"]);
   }
+  // 7. 多周期三角扫描（异步陆续补上；▲突破 ▼跌破 收敛=末端等方向 —=无形态 …=加载中）
+  if (S.triScan && S.triScan.code === S.active) {
+    var parts = [], upN = 0, dnN = 0;
+    ["周", "日", "60分", "30分", "15分", "5分"].forEach(function (nm) {
+      var b = S.triScan.res[nm];
+      if (b === 0) parts.push(nm + "·收敛");
+      else if (b > 0) { parts.push(nm + "·▲"); upN++; }
+      else if (b < 0) { parts.push(nm + "·▼"); dnN++; }
+    });
+    if (parts.length) rows.push(["多周期三角 " + parts.join(" ") + ((upN + dnN) ? " · " + (upN + dnN) + "周期已突破" : " · 预判等方向"), upN ? UP : (dnN ? DN : "#b78cff")]);
+  }
   // 综合评分
   var verdict = score >= total - 0.5 ? "偏多" : (score <= 1 ? "偏空" : "震荡");
   var vc = verdict === "偏多" ? UP : (verdict === "偏空" ? DN : "#d9b45c");
@@ -2016,7 +2057,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "均线"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"]];
+var INDS = [["ma", "EMA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
