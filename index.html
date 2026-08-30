@@ -553,15 +553,19 @@ function draw() {
   }
   var kl = S.kl, i0 = v.i0, i1 = v.i1;
   var d2 = dec();
-  // 网格 + 右侧价格轴
+  // 网格 + 右侧价格轴（自适应整数刻度：1/2/2.5/5 步进，约 6-9 条）
   ctx.font = "10px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-  for (var g = 0; g <= 4; g++) {
-    var gy = v.padT + v.priceH * g / 4;
-    var gp = v.hi - (v.hi - v.lo) * g / 4;
+  var range = v.hi - v.lo;
+  var raw = range / 7;
+  var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+  var niceStep = mag;
+  [1, 2, 2.5, 5, 10].forEach(function (m2) { if (raw >= mag * m2) niceStep = mag * m2; });
+  for (var gp2 = Math.ceil(v.lo / niceStep) * niceStep; gp2 <= v.hi; gp2 += niceStep) {
+    var gy = v.Y(gp2);
     ctx.strokeStyle = GRID; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(v.padL, gy); ctx.lineTo(v.padL + (i1 - i0) * v.step, gy); ctx.stroke();
     ctx.fillStyle = DIM;
-    ctx.fillText(gp.toFixed(d2), v.padL + (i1 - i0) * v.step + 4, gy);
+    ctx.fillText(gp2.toFixed(d2), v.padL + (i1 - i0) * v.step + 4, gy);
   }
   // 底部日期轴 + 竖直网格线（淡，4 条）
   ctx.textAlign = "center";
@@ -576,7 +580,9 @@ function draw() {
     ctx.fillStyle = DIM;
     ctx.fillText(ds, v.X(di), v.hh - 9);
   }
-  // K线（线图模式：收盘价折线 + 淡色面积）
+  // K线（线图模式：收盘价折线 + 淡色面积）——主图区裁切，防止竖直拖动时穿进副图
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, v.padT - 2, w, v.priceH + 4); ctx.clip();
   var bw = Math.max(1.5, v.step * 0.62);
   if (S.lineMode) {
     ctx.beginPath();
@@ -646,6 +652,7 @@ function draw() {
       lx += ctx.measureText(t).width + 8;
     });
   }
+  ctx.restore(); // 主图区裁切结束
   // 成交量副图
   var v0 = v.volY;
   ctx.strokeStyle = GRID;
@@ -667,15 +674,21 @@ function draw() {
   var MY = function (val) { return m0 + v.macdH / 2 - val / mAbs * (v.macdH / 2 - 8); };
   ctx.strokeStyle = GRID;
   ctx.beginPath(); ctx.moveTo(v.padL, m0); ctx.lineTo(v.padL + (i1 - i0) * v.step, m0); ctx.stroke();
-  ctx.fillStyle = DIM;
-  ctx.fillText("MACD 12/26/9", v.padL + 4, m0 + 7);
+  ctx.fillStyle = "#9fb0a6"; ctx.font = "10px -apple-system, sans-serif";
+  ctx.fillText("MACD 12/26/9", v.padL + 4, m0 + 8);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#f5f6fa";
+  ctx.fillText("DIF " + md.dif[i1 - 1].toFixed(3), v.padL + (i1 - i0) * v.step - 4, m0 + 8);
+  ctx.fillStyle = "#ffd21f";
+  ctx.fillText("DEA " + md.dea[i1 - 1].toFixed(3), v.padL + (i1 - i0) * v.step - 4, m0 + 19);
+  ctx.textAlign = "left";
   for (i = i0; i < i1; i++) {
     ctx.fillStyle = md.bar[i] >= 0 ? "rgba(255,111,102,0.6)" : "rgba(53,217,154,0.6)";
     var by = MY(md.bar[i]), bz = MY(0);
     ctx.fillRect(v.X(i) - bw / 4, Math.min(by, bz), bw / 2, Math.max(1, Math.abs(by - bz)));
   }
   [["dif", "#f5f6fa"], ["dea", "#ffd21f"]].forEach(function (pr) {
-    ctx.strokeStyle = pr[1]; ctx.lineWidth = 1.1; ctx.beginPath();
+    ctx.strokeStyle = pr[1]; ctx.lineWidth = 1.4; ctx.beginPath();
     var st = false;
     for (var j2 = i0; j2 < i1; j2++) {
       if (!st) { ctx.moveTo(v.X(j2), MY(md[pr[0]][j2])); st = true; }
@@ -683,14 +696,16 @@ function draw() {
     }
     ctx.stroke();
   });
-  // ICT 叠加层 + DDX≈/主力意愿≈ 副图
+  // ICT 叠加层 + 昨高低 + 监测面板（同样裁切在主图区内）
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, v.padT - 2, w, v.priceH + 4); ctx.clip();
   renderICT(ctx, v);
   renderDailyLevels(ctx, v);
   renderMonitor(ctx, v);
+  renderDrawings(ctx, v);
+  ctx.restore();
   renderRtflow(ctx, v);
   renderExtraPanes(ctx, v);
-  // 画线层
-  renderDrawings(ctx, v);
   // 十字线 + 信息卡
   if (S.cross) {
     var ci = v.I(S.cross.x);
@@ -983,7 +998,12 @@ cv.addEventListener("mousedown", function (e) {
 cv.addEventListener("mousemove", function (e) {
   var pt = posT(e);
   if (S.tool) { S.ghost = anchorAt(pt); draw(); return; }
-  if (!M) return;
+  if (!M) {
+    // 悬停即出十字线+金额（不用按住），移出画布消失
+    S.cross = { x: pt.x, y: pt.y, hover: true };
+    draw();
+    return;
+  }
   if (M.yzoom) {
     S.yZoom = Math.max(0.3, Math.min(6, M.z0 * (1 + (M.ly - pt.y) * 0.005)));
     draw();
@@ -1040,6 +1060,9 @@ cv.addEventListener("dblclick", function (e) {
   var pt = posT(e);
   if (pt.x > cv.clientWidth - 50) { S.yZoom = 1; S.yOff = 0; hint("价格轴缩放/位移已复位"); draw(); }
 });
+cv.addEventListener("mouseleave", function () {
+  if (!M && !S.tool && S.cross) { S.cross = null; draw(); }
+});
 /* ================= UI 构建 ================= */
 function buildTabs() {
   var el = document.querySelector("[data-tabs]");
@@ -1081,6 +1104,16 @@ function buildTabs() {
 function buildPeriods() {
   var el = document.querySelector("[data-periods]");
   el.innerHTML = "";
+  // K线/线图切换放最前（之前藏在行尾要滑才看到）
+  var lb = document.createElement("button");
+  lb.className = "btn tabbtn" + (S.lineMode ? " on" : "");
+  lb.type = "button"; lb.textContent = S.lineMode ? "线图" : "K线";
+  lb.addEventListener("click", function () {
+    S.lineMode = !S.lineMode;
+    store(); buildPeriods(); draw();
+    hint(S.lineMode ? "收盘价线图模式 · 再点切回K线蜡烛" : "K线蜡烛模式");
+  });
+  el.appendChild(lb);
   PERIODS.forEach(function (p) {
     var b = document.createElement("button");
     b.className = "btn tabbtn" + (p[0] === S.klt ? " on" : "");
@@ -1092,15 +1125,6 @@ function buildPeriods() {
     });
     el.appendChild(b);
   });
-  var lb = document.createElement("button");
-  lb.className = "btn tabbtn" + (S.lineMode ? " on" : "");
-  lb.type = "button"; lb.textContent = S.lineMode ? "线图" : "K线";
-  lb.addEventListener("click", function () {
-    S.lineMode = !S.lineMode;
-    store(); buildPeriods(); draw();
-    hint(S.lineMode ? "收盘价线图模式 · 再点切回K线蜡烛" : "K线蜡烛模式");
-  });
-  el.appendChild(lb);
 }
 function buildTools() {
   var el = document.querySelector("[data-tools]");
@@ -1497,7 +1521,7 @@ function renderRtflow(ctx, v) {
 }
 /* ================= 量化监测面板（实时信号汇总：BOLL位置/昨高低/主力/ MACD / 缺口） ================= */
 function renderMonitor(ctx, v) {
-  if (!S.ind.monitor || S.cross) return;
+  if (!S.ind.monitor || (S.cross && !S.cross.hover)) return;
   var kl = S.kl, n = kl.length;
   if (n < 20) return;
   var last = kl[n - 1][4];
