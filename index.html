@@ -77,7 +77,6 @@
 <div class="row seps" data-inds></div>
 <div id="chartwrap">
   <canvas data-chart></canvas>
-  <div class="badge">东财公开数据 · 有延迟<br>画线存本机 · 非投资建议</div>
 </div>
 <div class="hint" data-hint>加载中…</div>
 <script>
@@ -1387,20 +1386,29 @@ function renderDailyLevels(ctx, v) {
   var d2 = dec();
   var pre = byWeek ? "上周" : (S.klt === "102" ? "上周" : "昨");
   var pre2 = byWeek ? "本周" : (S.klt === "102" ? "本周" : "今");
+  // 先画线、收集标签，再统一防重叠放置（上下最小间隔 13px）
+  var labels = [];
   function lv(p, col, dash, lbl) {
     var y = v.Y(p);
     if (y < v.padT - 2 || y > v.padT + v.priceH + 2) return;
     ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash);
     ctx.beginPath(); ctx.moveTo(v.padL, y); ctx.lineTo(right, y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = col; ctx.font = "9px Menlo, monospace";
-    ctx.textAlign = "right"; ctx.textBaseline = "bottom";
-    ctx.fillText(lbl + " " + p.toFixed(d2), right - 3, y - 1);
+    labels.push({ y: y, t: lbl + " " + p.toFixed(d2), c: col });
   }
   lv(prev.hi, "#ff9a5c", [5, 4], pre + "高");
   lv(prev.lo, "#3fd6c2", [5, 4], pre + "低");
   lv(today.hi, "rgba(255,111,102,0.75)", [2, 3], pre2 + "高");
   lv(today.lo, "rgba(53,217,154,0.75)", [2, 3], pre2 + "低");
+  labels.sort(function (a, b) { return a.y - b.y; });
+  for (var li3 = 1; li3 < labels.length; li3++) {
+    if (labels[li3].y < labels[li3 - 1].y + 13) labels[li3].y = labels[li3 - 1].y + 13;
+  }
+  ctx.font = "9px Menlo, monospace"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+  labels.forEach(function (L2) {
+    ctx.fillStyle = L2.c;
+    ctx.fillText(L2.t, right - 3, L2.y - 1);
+  });
   // LuxAlgo 风格：把上一周期的整根蜡烛画在图表左缘（影线+实体），一眼看上个日/周的范围和方向
   var gx = v.padL + 16, gw2 = 5;
   var yH = v.Y(prev.hi), yL = v.Y(prev.lo), yO = v.Y(prev.o), yC = v.Y(prev.c);
@@ -1545,11 +1553,14 @@ function renderMonitor(ctx, v) {
   }
   if (difL > deaL) score++;
   rows.push(["MACD " + (difL > deaL ? "多头" : "空头") + cross2, difL > deaL ? UP : DN]);
-  // 5. 待补 FVG 缺口（上方缺口=涨到那里大概率遇压；下方缺口=跌到那里有支撑）
+  // 5. 待补缺口（口径收紧：只数最近60根内、高度≥0.5%价格的缺口，过滤毛刺）
   var ic2 = ictCalc(kl);
-  var upG = 0, dnG = 0;
-  ic2.fvg.forEach(function (z) { if (z.bot > last) upG++; else if (z.top < last) dnG++; });
-  if (upG || dnG) rows.push(["上方 " + upG +  " 个缺口没补(压力) · 下方 " + dnG + " 个没补(支撑)", "#b78cff"]);
+  var upG = 0, dnG = 0, minH = last * 0.005;
+  ic2.fvg.forEach(function (z) {
+    if (z.i < n - 60 || z.top - z.bot < minH) return;
+    if (z.bot > last) upG++; else if (z.top < last) dnG++;
+  });
+  if (upG || dnG) rows.push(["近60根有效缺口 · 上方 " + upG + " 个没补(压力) · 下方 " + dnG + " 个(支撑)", "#b78cff"]);
   // 综合评分
   var verdict = score >= total - 0.5 ? "偏多" : (score <= 1 ? "偏空" : "震荡");
   var vc = verdict === "偏多" ? UP : (verdict === "偏空" ? DN : "#d9b45c");
@@ -1726,7 +1737,7 @@ function buildInds() {
 restore();
 buildTabs(); buildPeriods(); buildTools(); buildInds();
 loadAll(true);
-hint("<span class=dim>拖动平移 · 双指缩放 · 右侧价格轴上下拖=纵向缩放(双击复位) · 长按十字线 · 点工具画线 · 按住画线拖动/拖黄点微调</span>");
+hint("<span class=dim>拖动平移(上下左右) · 双指缩放 · 右侧价格轴上下拖=纵向缩放(双击复位) · 长按十字线 · 点工具画线 · 按住画线拖动 ｜ 东财公开数据有延迟 · 画线存本机 · 非投资建议</span>");
 </script>
 </body>
 </html>
