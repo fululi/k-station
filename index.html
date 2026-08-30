@@ -97,7 +97,11 @@
 "use strict";
 /* ================= 数据层：东财 JSONP（手机浏览器可跨域） ================= */
 var UT = "fa5fd1943c7b386f172d6893dbfba10b";
-function secidOf(code) { return /^[569]/.test(code) ? "1." + code : "0." + code; }
+function isUS(code) { return /^us/i.test(code); }
+function typeOf(code) { for (var ti = 0; ti < S.codes.length; ti++) if (S.codes[ti][0] === code) return S.codes[ti][2] || ""; return ""; }
+function isIndex(code) { return typeOf(code) === "ZS"; }
+function noFund(code) { return isUS(code) || isIndex(code); }
+function secidOf(code) { var b = code.replace(/^(sh|sz)/, ""); return /^[569]/.test(b) ? "1." + b : "0." + b; }
 function jsonp(url, cb, ms) {
   var name = "emcb_" + Date.now() + "_" + Math.round(Math.random() * 1e9);
   var s = document.createElement("script");
@@ -114,7 +118,11 @@ function jsonp(url, cb, ms) {
   document.head.appendChild(s);
   setTimeout(function () { fin(new Error("请求超时")); }, ms || 12000);
 }
-function mktOf(code) { return /^[569]/.test(code) ? "sh" : (/^[03]/.test(code) ? "sz" : "sh"); }
+function txPrefix(code, stripSuffix) {
+  if (isUS(code)) { var u = code.toUpperCase(); return stripSuffix ? u.split(".")[0] : u; }
+  if (/^(sh|sz)/.test(code)) return code;
+  return (/^[569]/.test(code) ? "sh" : (/^[03]/.test(code) ? "sz" : "sh")) + code;
+}
 function fetchJSON(url, cb) {
   var done = false;
   var to = setTimeout(function () { if (!done) { done = true; cb(new Error("请求超时")); } }, 10000);
@@ -131,10 +139,12 @@ function txRows(rows) {
   }).filter(function (r) { return r[4] > 0; });
 }
 function fetchKlineTX(code, klt, cb) {
-  var prefix = mktOf(code) + code;
+  if (isUS(code) && klt !== "101" && klt !== "102") { cb(new Error("美股仅支持日线/周线")); return; }
+  var prefix = txPrefix(code);
   if (klt === "101" || klt === "102") {
     var per = klt === "101" ? "day" : "week";
-    fetchJSON("https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=" + prefix + "," + per + ",,,320,qfq", function (err, d) {
+    var api2 = isUS(code) ? "usfqkline" : "fqkline";
+    fetchJSON("https://web.ifzq.gtimg.cn/appstock/app/" + api2 + "/get?param=" + prefix + "," + per + ",,,320,qfq", function (err, d) {
       var sd = d && d.data && d.data[prefix];
       var rows = sd && (sd["qfq" + per] || sd[per]);
       if (err || !rows || !rows.length) { cb(err || new Error("腾讯无K线")); return; }
@@ -166,6 +176,7 @@ function fetchKlineEM(code, klt, cb) {
 function fetchKline(code, klt, cb) {
   fetchKlineTX(code, klt, function (err, kl, name) {
     if (!err && kl && kl.length) { cb(null, kl, name); return; }
+    if (isUS(code)) { cb(err || new Error("无K线数据")); return; }
     fetchKlineEM(code, klt, cb);
   });
 }
@@ -179,10 +190,16 @@ function fetchQuoteEM(code, cb) {
 }
 // 腾讯行情快照（qt.gtimg.cn，GBK 文本，CORS 放行）：f[1]名称 f[3]现价 f[4]昨收 f[44]流通市值(亿)
 function fetchQuote(code, cb) {
-  var prefix = mktOf(code) + code;
+  var prefix = txPrefix(code, true);
   var done = false;
   var to = setTimeout(fail, 8000);
-  function fail() { if (!done) { done = true; clearTimeout(to); fetchQuoteEM(code, cb); } }
+  function fail() {
+    if (!done) {
+      done = true; clearTimeout(to);
+      if (isUS(code)) { cb(new Error("无报价")); return; }
+      fetchQuoteEM(code, cb);
+    }
+  }
   fetch("https://qt.gtimg.cn/q=" + prefix)
     .then(function (r) { return r.arrayBuffer(); })
     .then(function (buf) {
@@ -196,7 +213,28 @@ function fetchQuote(code, cb) {
     })
     .catch(fail);
 }
-// 日级资金流历史（东财）：f51日期 f52主力净额(元) f57主力净占比% —— DDX≈/主力意愿≈的数据源
+// 腾讯联想搜索：名称/拼音 → 代码（A股个股/指数/ETF/美股）
+function unesc(s2) { try { return JSON.parse('"' + s2 + '"'); } catch (e) { return s2; } }
+function searchCode(kw, cb) {
+  fetch("https://smartbox.gtimg.cn/s3/?v=2&q=" + encodeURIComponent(kw) + "&t=all")
+    .then(function (r) { return r.text(); })
+    .then(function (txt) {
+      var m = txt.match(/"([^"]*)"/);
+      if (!m || !m[1]) { cb(null); return; }
+      var items = m[1].split("^");
+      for (var i = 0; i < items.length; i++) {
+        var f = items[i].split("~");
+        if (f.length < 5) continue;
+        if (f[0] === "us") { cb({ code: "us" + f[1].toUpperCase(), name: unesc(f[2]), type: "US" }); return; }
+        if ((f[0] === "sh" || f[0] === "sz") && (f[4] === "GP-A" || f[4] === "ZS" || f[4] === "ETF" || f[4] === "FJ")) {
+          cb({ code: f[0] + f[1], name: unesc(f[2]), type: f[4] }); return;
+        }
+      }
+      cb(null);
+    })
+    .catch(function () { cb(null); });
+}
+// 日级资金流历史（东财）：f51日期 f52主力净额(元) f57主力净占比%
 function fetchFFlow(code, cb) {
   var url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?secid=" + secidOf(code) +
     "&ut=" + UT + "&lmt=320&end=20500101&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57";
@@ -246,14 +284,14 @@ function fetchFFlowMin(code, cb) {
 }
 /* ================= 状态与持久化 ================= */
 var PERIODS = [["101", "日线"], ["102", "周线"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"]];
-var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5]];
+var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5], ["freedraw", "画笔", 2]];
 var S = {
   codes: [["600105", "永鼎股份"], ["600176", "中国巨石"], ["515880", "通信ETF"]],
   active: "600105", klt: "101",
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: true, tsline: true, fvg: true, liq: true, ms: true, ob: true, ddx: true, zlyy: true, pdhl: true, tdhl: true, rtflow: true, boll: true, monitor: true },
+  ind: { ma: true, tsline: true, lr: true, fvg: true, liq: true, ms: true, ob: true, ddx: false, zlyy: true, pdhl: true, tdhl: true, rtflow: true, boll: true, monitor: true },
   fflow: [], rtflow: [], floatMV: 0,
   lineMode: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false
 };
@@ -270,7 +308,7 @@ function restore() {
     if (o.codes && o.codes.length) S.codes = o.codes;
     if (o.active) S.active = o.active;
     if (o.klt) S.klt = o.klt;
-    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; }
+    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.lr == null) S.ind.lr = true; if (S.ind.ddx == null) S.ind.ddx = false; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; }
     if (o.lineMode != null) S.lineMode = !!o.lineMode;
     if (o.pdhlMode) S.pdhlMode = o.pdhlMode;
     if (o.monOpen != null) S.monOpen = !!o.monOpen;
@@ -285,7 +323,7 @@ var cv = document.querySelector("[data-chart]");
 var hintEl = document.querySelector("[data-hint]");
 function hint(t) { hintEl.innerHTML = t || ""; }
 function cls(p) { return p == null || isNaN(p) ? "flat" : (p > 0 ? "up" : (p < 0 ? "down" : "flat")); }
-function dec() { return S.active === "515880" ? 3 : 2; }
+function dec() { var t = typeOf(S.active); return (t === "ETF" || t === "FJ" || S.active === "515880") ? 3 : 2; }
 function fwp(v) { var d2 = dec(); return v == null || isNaN(v) ? "—" : v.toFixed(d2); }
 var UP = "#ff6f66", DN = "#35d99a", DIM = "#5d6f64", GRID = "rgba(38,51,44,0.6)", SEL = "#ffd21f";
 function maArr(kl, n) {
@@ -330,9 +368,9 @@ function view() {
   var avail = hh - padT - padB;
   var volH = Math.round(avail * 0.11);
   var macdH = Math.round(avail * 0.13);
-  var ddxH = S.ind.ddx ? Math.round(avail * 0.09) : 0;
-  var zlyyH = S.ind.zlyy ? Math.round(avail * 0.09) : 0;
-  var rtH = S.ind.rtflow ? Math.round(avail * 0.10) : 0;
+  var ddxH = 0;
+  var zlyyH = S.ind.zlyy && !noFund(S.active) ? Math.round(avail * 0.09) : 0;
+  var rtH = S.ind.rtflow && !noFund(S.active) ? Math.round(avail * 0.10) : 0;
   var subN = 2 + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0) + (rtH ? 1 : 0);
   var priceH = avail - volH - macdH - ddxH - zlyyH - rtH - 6 * subN;
   if (!S.count) S.count = Math.max(30, Math.round(plotW / 6.5));
@@ -407,7 +445,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
   ctx.font = "10px -apple-system, sans-serif";
   ctx.textAlign = "left"; ctx.textBaseline = "middle";
   var t = dg.type;
-  var MINP = { trend: 2, hline: 1, ray: 2, rect: 2, fib: 2, pct: 2, tri: 3, xabcd: 5 };
+  var MINP = { trend: 2, hline: 1, ray: 2, rect: 2, fib: 2, pct: 2, tri: 3, xabcd: 5, freedraw: 2 };
   if (pts.length < (MINP[t] || 2)) {
     // 进行中的多点画线：只画已落锚点之间的预览连线和点
     ctx.strokeStyle = sel ? SEL : "#e6b43c";
@@ -417,7 +455,13 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     }
     return;
   }
-  if (t === "trend") { drawSeg(ctx, pts[0], pts[1]); }
+  if (t === "freedraw") {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var fp = 1; fp < pts.length; fp++) ctx.lineTo(pts[fp].x, pts[fp].y);
+    ctx.stroke();
+  }
+  else if (t === "trend") { drawSeg(ctx, pts[0], pts[1]); }
   else if (t === "ray") {
     var dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
     if (Math.abs(dx) < 0.001) dx = 0.001;
@@ -639,6 +683,33 @@ function draw() {
       ctx.fillText(bt, v.padL + 4, v.padT + 33);
     }
   }
+  // 线性回归通道（可视区收盘价回归：白=中轨 红=+2σ 绿=-2σ，上红下绿）
+  if (S.ind.lr) {
+    var nL = i1 - i0;
+    if (nL >= 20) {
+      var sxL = 0, syL = 0, sxyL = 0, sxxL = 0;
+      for (var li5 = i0; li5 < i1; li5++) {
+        var xvL = li5 - i0, yvL = kl[li5][4];
+        sxL += xvL; syL += yvL; sxyL += xvL * yvL; sxxL += xvL * xvL;
+      }
+      var slL = (nL * sxyL - sxL * syL) / (nL * sxxL - sxL * sxL);
+      var icL = (syL - slL * sxL) / nL;
+      var sdL = 0;
+      for (li5 = i0; li5 < i1; li5++) { var dvL = kl[li5][4] - (icL + slL * (li5 - i0)); sdL += dvL * dvL; }
+      sdL = Math.sqrt(sdL / nL);
+      var pxP = v.priceH / (v.hi - v.lo);
+      [["rgba(232,242,234,0.75)", 0, []], ["rgba(255,111,102,0.8)", 2, [5, 4]], ["rgba(53,217,154,0.8)", -2, [5, 4]]].forEach(function (L4) {
+        ctx.strokeStyle = L4[0]; ctx.lineWidth = 1.1; ctx.setLineDash(L4[2]);
+        ctx.beginPath();
+        ctx.moveTo(v.X(i0), v.Y(icL) - L4[1] * sdL * pxP);
+        ctx.lineTo(v.X(i1 - 1), v.Y(icL + slL * (nL - 1)) - L4[1] * sdL * pxP);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+      ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText("LR±2σ", v.padL + 4, v.padT + 21);
+    }
+  }
   // 均线（可在指标行关闭）
   if (S.ind.ma) {
     var mas = [[5, "#f5f6fa"], [10, "#ffd21f"], [20, "#b78cff"], [60, "#57a7ff"]];
@@ -789,7 +860,8 @@ function hitTest(pt) {
     var dg = dl[idx], pts = ptsOf(v, im, dg.pts);
     if (!pts) continue;
     var d = Infinity, t = dg.type;
-    if (t === "trend" || t === "pct") d = distSeg(pt.x, pt.y, pts[0], pts[1]);
+    if (t === "freedraw") { for (var fs = 0; fs < pts.length - 1; fs++) d = Math.min(d, distSeg(pt.x, pt.y, pts[fs], pts[fs + 1])); }
+    else if (t === "trend" || t === "pct") d = distSeg(pt.x, pt.y, pts[0], pts[1]);
     else if (t === "ray") {
       var dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
       if (Math.abs(dx) < 0.001) dx = 0.001;
@@ -904,6 +976,15 @@ cv.addEventListener("touchstart", function (e) {
     return;
   }
   var pt = posT(e.touches[0]);
+  if (S.tool === "freedraw") {
+    var aF = anchorAt(pt);
+    if (aF) S.pending.push(aF);
+    S.selected = -1;
+    T = { mode: "free", lx: pt.x };
+    hint("画笔：按住滑动连续画线 · 松手完成");
+    draw();
+    return;
+  }
   if (S.tool) { placeAnchor(pt); T = { mode: "draw" }; return; }
   // 右侧价格轴：上下拖动 = 纵向缩放（不影响画图和平移）
   if (pt.x > cv.clientWidth - 50) { T = { mode: "yzoom", ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
@@ -951,6 +1032,13 @@ cv.addEventListener("touchmove", function (e) {
     draw();
     return;
   }
+  if (T.mode === "free") {
+    if (Math.abs(pt.x - T.lx) > 5) {
+      var aF2 = anchorAt(pt);
+      if (aF2) { S.pending.push(aF2); T.lx = pt.x; draw(); }
+    }
+    return;
+  }
   if (T.mode === "cross") {
     S.cross = { x: pt.x, y: pt.y };
     draw();
@@ -988,6 +1076,16 @@ cv.addEventListener("touchend", function (e) {
     draw();
   }
   else if (T.mode === "draw") { S.ghost = null; draw(); }
+  else if (T.mode === "free") {
+    if (S.pending.length >= 2) {
+      dlist().push({ type: "freedraw", pts: S.pending.slice() });
+      S.selected = dlist().length - 1;
+      store();
+      hint("画笔完成 · 按住可整体拖动 · 「删选」删除");
+    } else hint("");
+    S.pending = []; S.ghost = null; S.tool = null;
+    syncTools(); draw();
+  }
   else if (T.mode === "cross") { S.cross = null; hint(""); draw(); }
   else if (!T.moved && Date.now() - T.t0 < 300) { // 轻点：监测面板展开/收起，或选中/取消画线
     if (S.monRect && T.x0 >= S.monRect.x && T.x0 <= S.monRect.x + S.monRect.w && T.y0 >= S.monRect.y && T.y0 <= S.monRect.y + S.monRect.h) {
@@ -1005,6 +1103,14 @@ var M = null;
 cv.addEventListener("mousedown", function (e) {
   e.preventDefault();
   var pt = posT(e);
+  if (S.tool === "freedraw") {
+    var aM = anchorAt(pt);
+    if (aM) S.pending.push(aM);
+    M = { free: true, lx: pt.x };
+    hint("画笔：按住拖动连续画线 · 松开完成");
+    draw();
+    return;
+  }
   if (S.tool) { placeAnchor(pt); return; }
   if (pt.x > cv.clientWidth - 50) { M = { yzoom: true, ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
   var hit0 = hitTest(pt);
@@ -1041,6 +1147,13 @@ cv.addEventListener("mousemove", function (e) {
     return;
   }
   if (M.drag) { dragBy(M, pt); return; }
+  if (M.free) {
+    if (Math.abs(pt.x - M.lx) > 5) {
+      var aM2 = anchorAt(pt);
+      if (aM2) { S.pending.push(aM2); M.lx = pt.x; draw(); }
+    }
+    return;
+  }
   if (M.cross) { S.cross = { x: pt.x, y: pt.y }; draw(); return; }
   if (Math.abs(pt.x - M.x0) + Math.abs(pt.y - M.y0) > 6) {
     M.moved = true;
@@ -1065,6 +1178,18 @@ cv.addEventListener("mousemove", function (e) {
 window.addEventListener("mouseup", function () {
   if (!M) return;
   if (M.lp) { clearTimeout(M.lp); M.lp = null; }
+  if (M.free) {
+    if (S.pending.length >= 2) {
+      dlist().push({ type: "freedraw", pts: S.pending.slice() });
+      S.selected = dlist().length - 1;
+      store();
+      hint("画笔完成 · 按住可整体拖动 · 「删选」删除");
+    }
+    S.pending = []; S.ghost = null; S.tool = null;
+    syncTools(); draw();
+    M = null;
+    return;
+  }
   if (M.drag) {
     if (M.moved) { store(); }
     else { S.selected = M.idx; hint("已选中画线 · 按住可拖动 · 「删选」删除"); }
@@ -1141,20 +1266,31 @@ function buildTabs() {
   var box = document.createElement("span");
   box.className = "addbox";
   var inp = document.createElement("input");
-  inp.placeholder = "加代码"; inp.inputMode = "numeric"; inp.maxLength = 6;
+  inp.placeholder = "代码/名称"; inp.maxLength = 20;
   var add = document.createElement("button");
   add.className = "btn"; add.type = "button"; add.textContent = "＋";
   add.addEventListener("click", function () {
-    var code = (inp.value || "").trim();
-    if (!/^[0-9]{6}$/.test(code)) { hint("输入6位代码，如 600519"); return; }
-    if (!/^[56903]/.test(code)) { hint("暂支持沪深（5/6/9/0/3开头）"); return; }
-    fetchQuote(code, function (err, q) {
-      if (err) { hint("代码无效或暂无数据"); return; }
+    var kw = (inp.value || "").trim();
+    if (!kw) return;
+    function addOne(code, name, ty) {
       for (var i = 0; i < S.codes.length; i++) if (S.codes[i][0] === code) { hint("已在列表里"); return; }
-      S.codes.push([code, q.name || code]);
+      S.codes.push([code, name || code, ty || ""]);
       inp.value = "";
       store(); buildTabs();
-      hint("已加入 " + (q.name || code));
+      hint("已加入 " + (name || code) + " · 长按标签可删除");
+    }
+    if (/^[0-9]{6}$/.test(kw)) {
+      if (!/^[56903]/.test(kw)) { hint("6位代码暂支持沪深；或直接输名称，如 中金黄金 / 英伟达 / 上证指数"); return; }
+      fetchQuote(kw, function (err, q) {
+        if (err) { hint("代码无效或暂无数据"); return; }
+        addOne(kw, q.name || kw, "");
+      });
+      return;
+    }
+    hint("搜索「" + kw + "」…");
+    searchCode(kw, function (r) {
+      if (!r) { hint("没找到「" + kw + "」· 换关键词或输6位代码"); return; }
+      addOne(r.code, r.name, r.type);
     });
   });
   box.appendChild(inp); box.appendChild(add);
@@ -1267,8 +1403,10 @@ function loadAll(reset) {
       syncTop();
     }
   });
-  fetchFFlow(S.active, function () { draw(); });
-  if (S.ind.rtflow) fetchFFlowMin(S.active, function () { draw(); });
+  if (!noFund(S.active)) {
+    fetchFFlow(S.active, function () { draw(); });
+    if (S.ind.rtflow) fetchFFlowMin(S.active, function () { draw(); });
+  } else { S.fflow = []; S.rtflow = []; }
 }
 function inSession() {
   var d = new Date(), wd = d.getDay();
@@ -1306,8 +1444,10 @@ setInterval(function () {
     setFresh(true);
     draw();
   });
-  if (S.klt === "101") fetchFFlow(S.active, function () { draw(); });
-  if (S.ind.rtflow) fetchFFlowMin(S.active, function () { draw(); });
+  if (!noFund(S.active)) {
+    if (S.klt === "101") fetchFFlow(S.active, function () { draw(); });
+    if (S.ind.rtflow) fetchFFlowMin(S.active, function () { draw(); });
+  }
 }, inSession() ? 60000 : 300000);
 window.addEventListener("resize", draw);
 /* ================= ICT 叠加（FVG / 流动性BSL·SSL / 结构BOS·CHoCH / 订单块，简化口径） ================= */
@@ -1707,112 +1847,46 @@ function renderMonitor(ctx, v) {
   });
   S.monRect = { x: bx, y: by, w: bw4 + 26, h: bh };
 }
-/* ================= DDX≈ / 主力意愿≈ 副图（与桌面端同口径：东财日级资金流推算） ================= */
+/* ================= 主力净额副图（东财日级真实口径：超大单+大单净额，一条线看方向） ================= */
 function renderExtraPanes(ctx, v) {
-  if (!S.ind.ddx && !S.ind.zlyy) return;
+  if (!S.ind.zlyy || noFund(S.active)) return;
   var kl = S.kl;
-  var fm = {};
-  S.fflow.forEach(function (r) { fm[r.d] = r; });
   var right = v.padL + (v.i1 - v.i0) * v.step;
   var isDay = S.klt === "101";
-  function paneFrame(y, h, lbl) {
-    ctx.strokeStyle = GRID; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(v.padL, y); ctx.lineTo(right, y); ctx.stroke();
-    ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-    ctx.fillText(lbl, v.padL + 4, y + 9);
-  }
-  function noData(y, h, msg) {
+  var y2 = v.zlyyY, h2 = v.zlyyH;
+  ctx.strokeStyle = GRID; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(v.padL, y2); ctx.lineTo(right, y2); ctx.stroke();
+  ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("主力净额（东财真实口径·每日）", v.padL + 4, y2 + 9);
+  if (!isDay || !S.fflow.length) {
     ctx.fillStyle = DIM; ctx.font = "10px -apple-system, sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(msg, v.padL + (right - v.padL) / 2, y + h / 2);
+    ctx.fillText(isDay ? "资金流数据加载中…" : "日级指标 · 切回日线查看", v.padL + (right - v.padL) / 2, y2 + h2 / 2);
+    return;
   }
-  if (S.ind.ddx) {
-    var y = v.ddxY, h = v.ddxH, i;
-    paneFrame(y, h, isDay ? (S.floatMV > 0 ? "DDX≈（流通市值口径）" : "DDX≈（净占比口径）") : "DDX≈");
-    if (!isDay) noData(y, h, "日级指标 · 切回日线查看");
-    else if (!S.fflow.length) noData(y, h, "资金流数据加载中…");
-    else {
-      var vals = kl.map(function (k2) {
-        var r = fm[k2[0]];
-        if (!r) return null;
-        return S.floatMV > 0 ? r.main / S.floatMV * 100 : r.mainPct;
-      });
-      var mas = [smaNulls(vals, 5), smaNulls(vals, 10), smaNulls(vals, 20)];
-      var abs = 1e-9;
-      for (i = v.i0; i < v.i1; i++) {
-        if (vals[i] != null) abs = Math.max(abs, Math.abs(vals[i]));
-        mas.forEach(function (m2) { if (m2[i] != null) abs = Math.max(abs, Math.abs(m2[i])); });
-      }
-      var DY = function (val) { return y + h / 2 - val / abs * (h / 2 - 8); };
-      ctx.strokeStyle = "rgba(150,180,166,0.7)";
-      ctx.beginPath(); ctx.moveTo(v.padL, DY(0)); ctx.lineTo(right, DY(0)); ctx.stroke();
-      var bw2 = Math.max(1, v.step * 0.4);
-      for (i = v.i0; i < v.i1; i++) {
-        if (vals[i] == null) continue;
-        ctx.fillStyle = vals[i] >= 0 ? "rgba(255,111,102,0.85)" : "rgba(53,217,154,0.85)";
-        var y0 = DY(0), yv = DY(vals[i]);
-        ctx.fillRect(v.X(i) - bw2 / 2, Math.min(y0, yv), bw2, Math.max(1, Math.abs(yv - y0)));
-      }
-      [["#f5f6fa", 0], ["#ffd21f", 1], ["#b78cff", 2]].forEach(function (pr) {
-        ctx.strokeStyle = pr[0]; ctx.lineWidth = 1; ctx.beginPath();
-        var st = false;
-        for (var j = v.i0; j < v.i1; j++) {
-          if (mas[pr[1]][j] == null) continue;
-          if (!st) { ctx.moveTo(v.X(j), DY(mas[pr[1]][j])); st = true; } else ctx.lineTo(v.X(j), DY(mas[pr[1]][j]));
-        }
-        ctx.stroke();
-      });
-      var li = v.i1 - 1;
-      if (vals[li] != null) {
-        ctx.font = "9px Menlo, monospace"; ctx.textAlign = "right";
-        ctx.fillStyle = vals[li] >= 0 ? UP : DN;
-        ctx.fillText("DDX " + (vals[li] >= 0 ? "+" : "") + vals[li].toFixed(2), right - 4, y + 9);
-      }
-    }
+  var fm = {};
+  S.fflow.forEach(function (r) { fm[r.d] = r; });
+  var zv = kl.map(function (k3) { var r = fm[k3[0]]; return r ? r.main / 1e4 : null; });
+  var zAbs = 1e-9, i2;
+  for (i2 = v.i0; i2 < v.i1; i2++) if (zv[i2] != null) zAbs = Math.max(zAbs, Math.abs(zv[i2]));
+  var ZY = function (val) { return y2 + h2 / 2 - val / zAbs * (h2 / 2 - 8); };
+  ctx.strokeStyle = "rgba(150,180,166,0.9)";
+  ctx.beginPath(); ctx.moveTo(v.padL, ZY(0)); ctx.lineTo(right, ZY(0)); ctx.stroke();
+  ctx.lineWidth = 1.4;
+  for (i2 = v.i0 + 1; i2 < v.i1; i2++) {
+    if (zv[i2] == null || zv[i2 - 1] == null) continue;
+    ctx.strokeStyle = zv[i2] >= 0 ? UP : DN;
+    ctx.beginPath(); ctx.moveTo(v.X(i2 - 1), ZY(zv[i2 - 1])); ctx.lineTo(v.X(i2), ZY(zv[i2])); ctx.stroke();
   }
-  if (S.ind.zlyy) {
-    var y2 = v.zlyyY, h2 = v.zlyyH, i2;
-    paneFrame(y2, h2, "主力意愿≈（主力净额·万元，白MA5 金MA10）");
-    if (!isDay) noData(y2, h2, "日级指标 · 切回日线查看");
-    else if (!S.fflow.length) noData(y2, h2, "资金流数据加载中…");
-    else {
-      var zv = kl.map(function (k3) { var r = fm[k3[0]]; return r ? r.main / 1e4 : null; });
-      var zm = [smaNulls(zv, 5), smaNulls(zv, 10)];
-      var zAbs = 1e-9;
-      for (i2 = v.i0; i2 < v.i1; i2++) {
-        if (zv[i2] != null) zAbs = Math.max(zAbs, Math.abs(zv[i2]));
-        zm.forEach(function (m3) { if (m3[i2] != null) zAbs = Math.max(zAbs, Math.abs(m3[i2])); });
-      }
-      var ZY = function (val) { return y2 + h2 / 2 - val / zAbs * (h2 / 2 - 8); };
-      ctx.strokeStyle = "rgba(150,180,166,0.9)";
-      ctx.beginPath(); ctx.moveTo(v.padL, ZY(0)); ctx.lineTo(right, ZY(0)); ctx.stroke();
-      var bw3 = Math.max(1, v.step * 0.4);
-      for (i2 = v.i0; i2 < v.i1; i2++) {
-        if (zv[i2] == null) continue;
-        ctx.fillStyle = zv[i2] >= 0 ? "rgba(255,111,102,0.9)" : "rgba(53,217,154,0.9)";
-        var z0 = ZY(0), zv2 = ZY(zv[i2]);
-        ctx.fillRect(v.X(i2) - bw3 / 2, Math.min(z0, zv2), bw3, Math.max(1, Math.abs(zv2 - z0)));
-      }
-      [["#e4ede6", 0], ["#e6b43c", 1]].forEach(function (pr) {
-        ctx.strokeStyle = pr[0]; ctx.lineWidth = 1; ctx.beginPath();
-        var st2 = false;
-        for (var j3 = v.i0; j3 < v.i1; j3++) {
-          if (zm[pr[1]][j3] == null) continue;
-          if (!st2) { ctx.moveTo(v.X(j3), ZY(zm[pr[1]][j3])); st2 = true; } else ctx.lineTo(v.X(j3), ZY(zm[pr[1]][j3]));
-        }
-        ctx.stroke();
-      });
-      var li2 = v.i1 - 1;
-      if (zv[li2] != null) {
-        ctx.font = "9px Menlo, monospace"; ctx.textAlign = "right";
-        ctx.fillStyle = zv[li2] >= 0 ? UP : DN;
-        ctx.fillText((zv[li2] >= 0 ? "+" : "") + (Math.abs(zv[li2]) >= 10000 ? (zv[li2] / 10000).toFixed(2) + "亿" : Math.round(zv[li2]) + "万"), right - 4, y2 + 9);
-      }
-    }
+  var li2 = v.i1 - 1;
+  if (zv[li2] != null) {
+    ctx.font = "9px Menlo, monospace"; ctx.textAlign = "right";
+    ctx.fillStyle = zv[li2] >= 0 ? UP : DN;
+    ctx.fillText((zv[li2] >= 0 ? "+" : "") + (Math.abs(zv[li2]) >= 10000 ? (zv[li2] / 10000).toFixed(2) + "亿" : Math.round(zv[li2]) + "万"), right - 4, y2 + 9);
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "均线"], ["tsline", "分时线"], ["boll", "BOLL"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["tdhl", "今高低"], ["monitor", "监测"], ["rtflow", "实时主力"], ["ddx", "DDX≈"], ["zlyy", "主力意愿≈"]];
+var INDS = [["ma", "均线"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["tdhl", "今高低"], ["monitor", "监测"], ["rtflow", "实时主力"], ["zlyy", "主力净额"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
