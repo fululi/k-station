@@ -240,7 +240,7 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: true, fvg: true, liq: true, ms: true, ob: true, ddx: true, zlyy: true, pdhl: true, rtflow: true, boll: true },
+  ind: { ma: true, fvg: true, liq: true, ms: true, ob: true, ddx: true, zlyy: true, pdhl: true, rtflow: true, boll: true, monitor: true },
   fflow: [], rtflow: [], floatMV: 0,
   lineMode: false, pdhlMode: "day", yZoom: 1
 };
@@ -257,7 +257,7 @@ function restore() {
     if (o.codes && o.codes.length) S.codes = o.codes;
     if (o.active) S.active = o.active;
     if (o.klt) S.klt = o.klt;
-    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; if (S.ind.boll == null) S.ind.boll = true; }
+    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; }
     if (o.lineMode != null) S.lineMode = !!o.lineMode;
     if (o.pdhlMode) S.pdhlMode = o.pdhlMode;
     if (o.draw) DRAW = o.draw;
@@ -682,6 +682,7 @@ function draw() {
   // ICT 叠加层 + DDX≈/主力意愿≈ 副图
   renderICT(ctx, v);
   renderDailyLevels(ctx, v);
+  renderMonitor(ctx, v);
   renderRtflow(ctx, v);
   renderExtraPanes(ctx, v);
   // 画线层
@@ -1464,6 +1465,89 @@ function renderRtflow(ctx, v) {
   ctx.fillStyle = "#ff9a5c";
   ctx.fillText("超大 " + wan(cumS[last]), right - 4, y + 20);
 }
+/* ================= 量化监测面板（实时信号汇总：BOLL位置/昨高低/主力/ MACD / 缺口） ================= */
+function renderMonitor(ctx, v) {
+  if (!S.ind.monitor || S.cross) return;
+  var kl = S.kl, n = kl.length;
+  if (n < 20) return;
+  var last = kl[n - 1][4];
+  var rows = [], score = 0, total = 0;
+  // 1. BOLL 位置
+  var bb = bollArr(kl, 14, 2);
+  if (bb.mid[n - 1] != null) {
+    total++;
+    var pos = last > bb.up[n - 1] ? "上轨外·强势" : (last > bb.mid[n - 1] ? "中上轨" : (last > bb.dn[n - 1] ? "中下轨" : "下轨外·弱势"));
+    var bUp = last > bb.mid[n - 1];
+    if (bUp) score++;
+    rows.push(["BOLL " + pos, bUp ? UP : DN]);
+  }
+  // 2. 昨高/昨低
+  var g = [], cur = null;
+  for (var i = 0; i < n; i++) {
+    var dk = kl[i][0].slice(0, 10);
+    if (!cur || cur.k !== dk) { cur = { k: dk, hi: -1e18, lo: 1e18 }; g.push(cur); }
+    if (kl[i][2] > cur.hi) cur.hi = kl[i][2];
+    if (kl[i][3] < cur.lo) cur.lo = kl[i][3];
+  }
+  if (g.length >= 2) {
+    total++;
+    var pv = g[g.length - 2];
+    var t2, c2;
+    if (last > pv.hi) { t2 = "突破昨高 +" + (last / pv.hi * 100 - 100).toFixed(1) + "%"; c2 = UP; score += 1; }
+    else if (last < pv.lo) { t2 = "跌破昨低 -" + (100 - last / pv.lo * 100).toFixed(1) + "%"; c2 = DN; }
+    else { t2 = "昨高下方 " + (last / pv.hi * 100 - 100).toFixed(1) + "% · 昨低上方 +" + (last / pv.lo * 100 - 100).toFixed(1) + "%"; c2 = "#d9b45c"; score += 0.5; }
+    rows.push(["昨低 " + pv.lo.toFixed(dec()) + " ~ 昨高 " + pv.hi.toFixed(dec()), "#8fa398"]);
+    rows.push([t2, c2]);
+  }
+  // 3. 主力资金（今日累计 + 近30分钟动向）
+  total++;
+  if (S.rtflow.length) {
+    var cum3 = 0, snaps = [];
+    for (var r3 = 0; r3 < S.rtflow.length; r3++) { cum3 += S.rtflow[r3].main; snaps.push(cum3); }
+    var back = Math.max(0, snaps.length - 30);
+    var slope = snaps[snaps.length - 1] - snaps[back];
+    var w3 = cum3 / 1e4, sw3 = slope / 1e4;
+    if (cum3 > 0) score++;
+    rows.push(["主力 " + (w3 >= 0 ? "+" : "") + Math.round(w3) + "万 · 近30分 " + (Math.abs(sw3) < 5 ? "平稳" : ((sw3 >= 0 ? "+" : "") + Math.round(sw3) + "万 " + (slope >= 0 ? "流入" : "流出"))), cum3 >= 0 ? UP : DN]);
+  } else {
+    rows.push(["主力 · 非交易时段/加载中", "#8fa398"]);
+  }
+  // 4. MACD 多空 + 金叉死叉
+  total++;
+  var md2 = macdArr(kl);
+  var difL = md2.dif[n - 1], deaL = md2.dea[n - 1];
+  var cross2 = "";
+  for (var c3 = Math.max(1, n - 3); c3 < n; c3++) {
+    if (md2.dif[c3 - 1] <= md2.dea[c3 - 1] && md2.dif[c3] > md2.dea[c3]) cross2 = " · 近3根金叉";
+    if (md2.dif[c3 - 1] >= md2.dea[c3 - 1] && md2.dif[c3] < md2.dea[c3]) cross2 = " · 近3根死叉";
+  }
+  if (difL > deaL) score++;
+  rows.push(["MACD " + (difL > deaL ? "多头" : "空头") + cross2, difL > deaL ? UP : DN]);
+  // 5. 待补 FVG 缺口
+  var ic2 = ictCalc(kl);
+  var upG = 0, dnG = 0;
+  ic2.fvg.forEach(function (z) { if (z.bot > last) upG++; else if (z.top < last) dnG++; });
+  if (upG || dnG) rows.push(["待补缺口 · 上方×" + upG + " 下方×" + dnG, "#b78cff"]);
+  // 综合评分
+  var verdict = score >= total - 0.5 ? "偏多" : (score <= 1 ? "偏空" : "震荡");
+  var vc = verdict === "偏多" ? UP : (verdict === "偏空" ? DN : "#d9b45c");
+  rows.push(["综合 " + verdict + " " + score + "/" + total, vc]);
+  // 绘制面板
+  ctx.font = "10px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  var bw4 = 0;
+  rows.forEach(function (r) { bw4 = Math.max(bw4, ctx.measureText(r[0]).width); });
+  var bx = v.padL + 4, by = v.padT + 44, bh = rows.length * 15 + 10;
+  ctx.fillStyle = "rgba(10,14,11,0.82)";
+  ctx.fillRect(bx, by, bw4 + 26, bh);
+  ctx.strokeStyle = vc; ctx.lineWidth = 1;
+  ctx.strokeRect(bx, by, bw4 + 26, bh);
+  rows.forEach(function (r, ri) {
+    ctx.fillStyle = r[1];
+    ctx.beginPath(); ctx.arc(bx + 8, by + 13 + ri * 15, 2.5, 0, 7); ctx.fill();
+    ctx.fillStyle = ri === rows.length - 1 ? r[1] : "#c3d2c6";
+    ctx.fillText(r[0], bx + 16, by + 13 + ri * 15);
+  });
+}
 /* ================= DDX≈ / 主力意愿≈ 副图（与桌面端同口径：东财日级资金流推算） ================= */
 function renderExtraPanes(ctx, v) {
   if (!S.ind.ddx && !S.ind.zlyy) return;
@@ -1569,7 +1653,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "均线"], ["boll", "BOLL"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["rtflow", "实时主力"], ["ddx", "DDX≈"], ["zlyy", "主力意愿≈"]];
+var INDS = [["ma", "均线"], ["boll", "BOLL"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["monitor", "监测"], ["rtflow", "实时主力"], ["ddx", "DDX≈"], ["zlyy", "主力意愿≈"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
