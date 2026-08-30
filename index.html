@@ -99,6 +99,18 @@
 <div id="chartwrap">
   <canvas data-chart></canvas>
 </div>
+<details id="icthelp">
+  <summary>📖 图上标注都是啥意思（点我展开）</summary>
+  <div class="icthelp-body">
+    <b class="down">FVG支撑</b> / <b class="up">FVG压力</b>：三根蜡烛的跳空缺口，价格倾向回补；"·半补"=已补一半，剩一半悬着，缺口上下沿就是支撑/压力<br>
+    <b style="color:#ff9a5c">BSL 橙带</b>：前高点上方的<b>空头止损密集区</b>。主力要出货需要买盘接盘，常把价格拉到这里扫掉空头止损——所以它是"拉升目标位"，到了别追<br>
+    <b style="color:#3fd6c2">SSL 青带</b>：前低点下方的<b>多头止损密集区</b>。主力要进货需要卖盘，常砸到这里扫掉多头止损——所以它是"洗盘目标位"，砸到别怕<br>
+    <b style="color:#57a7ff">OB·进货区</b>（蓝块）：一波拉升前的最后一根阴线，主力建仓成本区，回踩到这里看支撑<br>
+    <b style="color:#ffd21f">OB·出货区</b>（黄块）：一波下跌前的最后一根阳线，主力派发区，反弹到这里看压力<br>
+    <b class="flat">BOS↗/↘</b>：收盘顺势突破前高/前低 = 趋势延续，顺势单的加仓参考<br>
+    <b style="color:#ff6fd8">CHoCH⚠</b>：收盘逆势跌破/突破结构 = 趋势可能反转的<b>预警</b>（不是确认），出现它要收紧止损
+  </div>
+</details>
 <div class="hint" data-hint>加载中…</div>
 <script>
 "use strict";
@@ -1762,19 +1774,24 @@ function renderICT(ctx, v) {
       ctx.setLineDash([]);
       ctx.fillStyle = z.bull ? "#35d99a" : "#ff6f66";
       ctx.font = "8.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText(z.part ? "FVG·半补" : "FVG", x0 + 2, (yT + yB) / 2);
+      ctx.fillText((z.bull ? "FVG支撑" : "FVG压力") + (z.part ? "·半补" : ""), x0 + 2, (yT + yB) / 2);
     });
   }
   if (S.ind.liq) {
     ic.liq.forEach(function (L) {
       if (L.i < v.i0 - 5) return;
+      var isB = L.side === "BSL";
+      var col = isB ? "#ff9a5c" : "#3fd6c2";
       var y = v.Y(L.p), x0 = Math.max(v.padL, v.X(L.i));
-      ctx.strokeStyle = "#b78cff"; ctx.lineWidth = 1; ctx.setLineDash([5, 4]);
+      var bh2 = Math.max(2, v.Y(L.p - kl[n - 1][4] * 0.003) - y); // 带半高≈0.3%价格
+      ctx.fillStyle = isB ? "rgba(255,154,92,0.08)" : "rgba(63,214,194,0.08)";
+      ctx.fillRect(x0, y - bh2, right - x0, bh2 * 2);
+      ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([5, 4]);
       ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(right, y); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = "#b78cff"; ctx.font = "9px -apple-system, sans-serif";
+      ctx.fillStyle = col; ctx.font = "8.5px -apple-system, sans-serif";
       ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      ctx.fillText(L.side + " " + L.p.toFixed(d2), x0 + 2, y - 1);
+      ctx.fillText(L.side + " " + L.p.toFixed(d2), x0 + 2, y - 2);
     });
   }
   if (S.ind.ms) {
@@ -1782,13 +1799,13 @@ function renderICT(ctx, v) {
       if (st.i < v.i0 - 5 || st.from < v.i0 - 40) return;
       var y = v.Y(st.p);
       var x0 = Math.max(v.padL, v.X(st.from)), x1 = v.X(st.i);
-      ctx.strokeStyle = st.txt === "BOS" ? "rgba(228,237,230,0.55)" : "#ff9a5c";
+      ctx.strokeStyle = st.txt === "BOS" ? "rgba(228,237,230,0.55)" : "#ff6fd8";
       ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
       ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1 + v.step * 2, y); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = st.txt === "BOS" ? "#c3d2c6" : "#ff9a5c";
+      ctx.fillStyle = st.txt === "BOS" ? "#c3d2c6" : "#ff6fd8";
       ctx.font = "9px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      ctx.fillText(st.txt, x1 + 2, y - 1);
+      ctx.fillText(st.txt === "BOS" ? (st.up ? "BOS↗" : "BOS↘") : (st.up ? "CHoCH⚠↗" : "CHoCH⚠↘"), x1 + 2, y - 1);
     });
   }
   if (S.ind.ob) {
@@ -1796,14 +1813,14 @@ function renderICT(ctx, v) {
       if (o.i < v.i0 - 10) return;
       var x0 = Math.max(v.padL, v.X(o.i));
       var yT = v.Y(o.top), yB = v.Y(o.bot);
-      ctx.fillStyle = o.bull ? "rgba(87,167,255,0.12)" : "rgba(255,154,92,0.12)";
+      ctx.fillStyle = o.bull ? "rgba(87,167,255,0.12)" : "rgba(255,210,31,0.10)";
       ctx.fillRect(x0, yT, right - x0, Math.max(1, yB - yT));
-      ctx.strokeStyle = o.bull ? "rgba(87,167,255,0.5)" : "rgba(255,154,92,0.5)";
+      ctx.strokeStyle = o.bull ? "rgba(87,167,255,0.5)" : "rgba(255,210,31,0.45)";
       ctx.lineWidth = 1;
       ctx.strokeRect(x0, yT, right - x0, Math.max(1, yB - yT));
-      ctx.fillStyle = o.bull ? "#57a7ff" : "#ff9a5c";
+      ctx.fillStyle = o.bull ? "#57a7ff" : "#ffd21f";
       ctx.font = "8.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText("OB", x0 + 2, (yT + yB) / 2);
+      ctx.fillText(o.bull ? "OB·进货区" : "OB·出货区", x0 + 2, (yT + yB) / 2);
     });
   }
 }
