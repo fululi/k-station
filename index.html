@@ -50,6 +50,8 @@
   .row::-webkit-scrollbar { display: none; }
   .row .btn { flex: none; white-space: nowrap; }
   .row.seps { padding-top: 2px; }
+  .topbar .fresh { font-size: 10px; color: #5d6f64; flex: none; font-variant-numeric: tabular-nums; }
+  .topbar .fresh.bad { color: #ff6f66; }
   body.rows-off .row { display: none; }
   .tabbtn { font-size: 13px; padding: 7px 14px; border-radius: 16px; }
   .tabbtn.on { background: #1a211c; color: #e8f2ea; border-color: #3a4a40; }
@@ -79,6 +81,7 @@
   <span class="px flat" data-px>—</span>
   <span class="pct flat" data-pct>—</span>
   <span class="spacer"></span>
+  <span class="fresh" data-fresh></span>
   <button class="btn" data-refresh type="button">刷新</button>
   <button class="btn" data-collapse type="button">收起▲</button>
 </div>
@@ -1092,6 +1095,16 @@ cv.addEventListener("mouseleave", function () {
   if (!M && !S.tool && S.cross) { S.cross = null; draw(); }
 });
 /* ================= UI 构建 ================= */
+function delCode(code) {
+  if (S.codes.length <= 1) { hint("至少保留一个标的"); return; }
+  S.codes = S.codes.filter(function (c2) { return c2[0] !== code; });
+  Object.keys(DRAW).forEach(function (k) { if (k.indexOf(code + ":") === 0) delete DRAW[k]; });
+  if (S.active === code) {
+    S.active = S.codes[0][0]; S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.tool = null; S.yZoom = 1; S.yOff = 0; S.rtflow = [];
+    store(); buildTabs(); syncTools(); loadAll(true);
+  } else { store(); buildTabs(); }
+  hint("已删除 " + code + " 及其画线 · 长按标签可删除");
+}
 function buildTabs() {
   var el = document.querySelector("[data-tabs]");
   el.innerHTML = "";
@@ -1105,6 +1118,24 @@ function buildTabs() {
       S.active = c[0]; S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.tool = null; S.yZoom = 1; S.yOff = 0; S.rtflow = [];
       store(); buildTabs(); syncTools(); loadAll(true);
     });
+    // 长按 0.55 秒删除该标的（手指移动超 10px 视为横滑取消）
+    var lpT = null, lx0 = 0, ly0 = 0;
+    function cancelLp() { if (lpT) { clearTimeout(lpT); lpT = null; } }
+    b.addEventListener("pointerdown", function (e) {
+      lx0 = e.clientX; ly0 = e.clientY;
+      lpT = setTimeout(function () {
+        lpT = null;
+        if (navigator.vibrate) navigator.vibrate(10);
+        delCode(c[0]);
+      }, 550);
+    });
+    b.addEventListener("pointermove", function (e) {
+      if (lpT && (Math.abs(e.clientX - lx0) > 10 || Math.abs(e.clientY - ly0) > 10)) cancelLp();
+    });
+    b.addEventListener("pointerup", cancelLp);
+    b.addEventListener("pointercancel", cancelLp);
+    b.addEventListener("pointerleave", cancelLp);
+    b.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     el.appendChild(b);
   });
   var box = document.createElement("span");
@@ -1208,15 +1239,24 @@ function syncTop() {
   }
 }
 /* ================= 加载与刷新 ================= */
+function setFresh(ok) {
+  var el = document.querySelector("[data-fresh]");
+  if (!el) return;
+  var d = new Date();
+  var t = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  el.textContent = (ok ? "已更新 " : "失败 ") + t;
+  el.className = "fresh" + (ok ? "" : " bad");
+}
 function loadAll(reset) {
   hint("加载K线数据…");
   fetchKline(S.active, S.klt, function (err, kl, name) {
-    if (err) { hint("K线加载失败：" + err.message + " · 点「刷新」重试 <span class=dim>（检查网络）</span>"); draw(); return; }
+    if (err) { setFresh(false); hint("K线加载失败：" + err.message + " · 点「刷新」重试 <span class=dim>（检查网络）</span>"); draw(); return; }
     var atEnd = !S.kl.length || S.end >= S.kl.length;
     S.kl = kl;
     if (name) S.name = name;
     if (atEnd || reset) S.end = kl.length;
     hint("");
+    setFresh(true);
     syncTop(); draw();
   });
   fetchQuote(S.active, function (err, q) {
@@ -1259,10 +1299,11 @@ setInterval(function () {
 setInterval(function () {
   if (document.hidden) return;
   fetchKline(S.active, S.klt, function (err, kl) {
-    if (err) return;
+    if (err) { setFresh(false); return; }
     var atEnd = S.end >= S.kl.length;
     S.kl = kl;
     if (atEnd) S.end = kl.length;
+    setFresh(true);
     draw();
   });
   if (S.klt === "101") fetchFFlow(S.active, function () { draw(); });
