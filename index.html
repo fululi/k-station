@@ -88,6 +88,7 @@
   <span class="pct flat" data-pct>—</span>
   <span class="spacer"></span>
   <span class="fresh" data-fresh></span>
+  <button class="btn" onclick="location.href='https://fululi.github.io/hq-mobile/'" type="button">持仓</button>
   <button class="btn" data-refresh type="button">刷新</button>
   <button class="btn" data-collapse type="button">收起▲</button>
 </div>
@@ -1503,6 +1504,17 @@ function loadAll(reset) {
     S.kl = kl;
     if (name) S.name = name;
     if (atEnd || reset) S.end = kl.length;
+    if (S.urlLines) {
+      var d0 = kl[kl.length - 1][0], dl2 = dlist(), chg = false;
+      S.urlLines.forEach(function (pv) {
+        for (var j = 0; j < dl2.length; j++) {
+          if (dl2[j].type === "hline" && Math.abs(dl2[j].pts[0].p - pv) / pv < 0.001) return;
+        }
+        dl2.push({ type: "hline", pts: [{ d: d0, p: pv }] }); chg = true;
+      });
+      S.urlLines = null;
+      if (chg) store();
+    }
     hint("");
     setFresh(true);
     syncTop(); draw();
@@ -2137,7 +2149,32 @@ function buildInds() {
   });
 }
 /* ================= 启动（放最后：确保所有函数/var 均已就绪） ================= */
+// hq-mobile 跳转参数：?code=600105&lines=44.2,41.5 （lines 在 K 线加载后落成水平线，同价位去重）
+function applyUrl() {
+  try {
+    var q = new URLSearchParams(location.search);
+    var code = q.get("code");
+    if (code) {
+      code = code.trim();
+      var found = false;
+      for (var i = 0; i < S.codes.length; i++) {
+        if (S.codes[i][0] === code || S.codes[i][0] === code.replace(/^(sh|sz)/, "")) { code = S.codes[i][0]; found = true; break; }
+      }
+      if (!found) S.codes.push([code, code]);
+      S.active = code;
+      S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.tool = null; S.yZoom = 1; S.yOff = 0; S.rtflow = [];
+    }
+    var lines = q.get("lines");
+    if (lines) {
+      var arr = [];
+      lines.split(",").forEach(function (s2) { var pv = parseFloat(s2); if (pv > 0) arr.push(pv); });
+      if (arr.length) S.urlLines = arr;
+    }
+    if (code || lines) store();
+  } catch (e) {}
+}
 restore();
+applyUrl();
 buildTabs(); buildPeriods(); buildTools(); buildInds(); syncCollapse();
 loadAll(true);
 hint("<span class=dim>拖动平移(上下左右) · 双指缩放 · 右侧价格轴上下拖=纵向缩放(双击复位) · 长按十字线 · 点工具画线 · 按住画线拖动 ｜ 东财公开数据有延迟 · 画线存本机 · 非投资建议</span>");
