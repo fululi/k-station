@@ -242,12 +242,12 @@ var S = {
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
   ind: { ma: true, fvg: true, liq: true, ms: true, ob: true, ddx: true, zlyy: true, pdhl: true, rtflow: true, boll: true, monitor: true },
   fflow: [], rtflow: [], floatMV: 0,
-  lineMode: false, pdhlMode: "day", yZoom: 1
+  lineMode: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false
 };
 var DRAW = {}; // "code:klt" -> [{type, pts:[{i,p}...]}]
 function store() {
   try {
-    localStorage.setItem("ksm_v1", JSON.stringify({ codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode }));
+    localStorage.setItem("ksm_v1", JSON.stringify({ codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen }));
   } catch (e) {}
 }
 function restore() {
@@ -260,6 +260,7 @@ function restore() {
     if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; }
     if (o.lineMode != null) S.lineMode = !!o.lineMode;
     if (o.pdhlMode) S.pdhlMode = o.pdhlMode;
+    if (o.monOpen != null) S.monOpen = !!o.monOpen;
     if (o.draw) DRAW = o.draw;
   } catch (e) {}
 }
@@ -337,6 +338,8 @@ function view() {
     var midP = (hi + lo) / 2, halfP = (hi - lo) / 2 / S.yZoom;
     hi = midP + halfP; lo = midP - halfP;
   }
+  // 价格纵向平移（按住K线区上下拖，图随手走）
+  if (S.yOff) { hi += S.yOff; lo += S.yOff; }
   var step = plotW / (i1 - i0);
   var volY = padT + priceH + 6, macdY = volY + volH + 6;
   var rtY = macdY + macdH + 6;
@@ -561,12 +564,14 @@ function draw() {
     ctx.fillStyle = DIM;
     ctx.fillText(gp.toFixed(d2), v.padL + (i1 - i0) * v.step + 4, gy);
   }
-  // 底部日期轴
+  // 底部日期轴 + 竖直网格线（淡，4 条）
   ctx.textAlign = "center";
   var nLbl = 4;
   for (var dl2 = 0; dl2 <= nLbl; dl2++) {
     var di = Math.round(i0 + (i1 - i0 - 1) * dl2 / nLbl);
     if (di < i0 || di >= i1) continue;
+    ctx.strokeStyle = GRID; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(v.X(di), v.padT); ctx.lineTo(v.X(di), v.bottom); ctx.stroke();
     var ds = kl[di][0];
     ds = S.klt === "101" ? ds.slice(5) : (S.klt === "102" ? ds.slice(2, 7) : ds.slice(5, 16));
     ctx.fillStyle = DIM;
@@ -865,7 +870,7 @@ cv.addEventListener("touchstart", function (e) {
     syncTools(); draw();
     return;
   }
-  T = { mode: "idle", x0: pt.x, y0: pt.y, lx: pt.x, t0: Date.now(), moved: false };
+  T = { mode: "idle", x0: pt.x, y0: pt.y, lx: pt.x, ly: pt.y, t0: Date.now(), moved: false };
   T.lp = setTimeout(function () {
     if (T && T.mode === "idle" && !T.moved) {
       T.mode = "cross";
@@ -918,8 +923,14 @@ cv.addEventListener("touchmove", function (e) {
       var n = S.kl.length;
       S.end = Math.max(Math.min(S.count, n), Math.min(n, S.end - shift));
       T.lx = pt.x;
-      draw();
     }
+    // 竖直拖图：图随手走（上下）
+    var dyy = T.ly - pt.y;
+    if (Math.abs(dyy) > 1.5) {
+      S.yOff -= dyy / v.priceH * (v.hi - v.lo);
+      T.ly = pt.y;
+    }
+    draw();
   }
 }, { passive: false });
 cv.addEventListener("touchend", function (e) {
@@ -933,7 +944,10 @@ cv.addEventListener("touchend", function (e) {
   }
   else if (T.mode === "draw") { S.ghost = null; draw(); }
   else if (T.mode === "cross") { S.cross = null; hint(""); draw(); }
-  else if (!T.moved && Date.now() - T.t0 < 300) { // 轻点：选中/取消画线
+  else if (!T.moved && Date.now() - T.t0 < 300) { // 轻点：监测面板展开/收起，或选中/取消画线
+    if (S.monRect && T.x0 >= S.monRect.x && T.x0 <= S.monRect.x + S.monRect.w && T.y0 >= S.monRect.y && T.y0 <= S.monRect.y + S.monRect.h) {
+      S.monOpen = !S.monOpen; store(); draw(); T = null; return;
+    }
     var hit = hitTest({ x: T.x0, y: T.y0 });
     S.selected = hit;
     hint(hit >= 0 ? "已选中画线 · 点「删选」删除" : "");
@@ -957,7 +971,7 @@ cv.addEventListener("mousedown", function (e) {
     return;
   }
   S.selected = -1; syncTools();
-  M = { x0: pt.x, y0: pt.y, lx: pt.x, t0: Date.now(), moved: false, cross: false };
+  M = { x0: pt.x, y0: pt.y, lx: pt.x, ly: pt.y, t0: Date.now(), moved: false, cross: false };
   M.lp = setTimeout(function () {
     if (M && !M.moved) {
       M.cross = true;
@@ -989,8 +1003,13 @@ cv.addEventListener("mousemove", function (e) {
       var n = S.kl.length;
       S.end = Math.max(Math.min(S.count, n), Math.min(n, S.end - shift));
       M.lx = pt.x;
-      draw();
     }
+    var dyy = M.ly - pt.y;
+    if (Math.abs(dyy) > 1.5) {
+      S.yOff -= dyy / v.priceH * (v.hi - v.lo);
+      M.ly = pt.y;
+    }
+    draw();
   }
 });
 window.addEventListener("mouseup", function () {
@@ -1003,6 +1022,9 @@ window.addEventListener("mouseup", function () {
   }
   else if (M.cross) { S.cross = null; hint(""); draw(); }
   else if (!M.moved && Date.now() - M.t0 < 400) {
+    if (S.monRect && M.x0 >= S.monRect.x && M.x0 <= S.monRect.x + S.monRect.w && M.y0 >= S.monRect.y && M.y0 <= S.monRect.y + S.monRect.h) {
+      S.monOpen = !S.monOpen; store(); draw(); M = null; return;
+    }
     var hit = hitTest({ x: M.x0, y: M.y0 });
     S.selected = hit;
     hint(hit >= 0 ? "已选中画线 · 点「删选」删除" : "");
@@ -1017,7 +1039,7 @@ cv.addEventListener("wheel", function (e) {
 }, { passive: false });
 cv.addEventListener("dblclick", function (e) {
   var pt = posT(e);
-  if (pt.x > cv.clientWidth - 50) { S.yZoom = 1; hint("价格轴缩放已复位"); draw(); }
+  if (pt.x > cv.clientWidth - 50) { S.yZoom = 1; S.yOff = 0; hint("价格轴缩放/位移已复位"); draw(); }
 });
 /* ================= UI 构建 ================= */
 function buildTabs() {
@@ -1030,7 +1052,7 @@ function buildTabs() {
     b.textContent = c[1] || c[0];
     b.addEventListener("click", function () {
       if (S.active === c[0]) return;
-      S.active = c[0]; S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.tool = null; S.yZoom = 1; S.rtflow = [];
+      S.active = c[0]; S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.tool = null; S.yZoom = 1; S.yOff = 0; S.rtflow = [];
       store(); buildTabs(); syncTools(); loadAll(true);
     });
     el.appendChild(b);
@@ -1066,7 +1088,7 @@ function buildPeriods() {
     b.type = "button"; b.textContent = p[1];
     b.addEventListener("click", function () {
       if (S.klt === p[0]) return;
-      S.klt = p[0]; S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.yZoom = 1;
+      S.klt = p[0]; S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.yZoom = 1; S.yOff = 0;
       store(); buildPeriods(); loadAll(true);
     });
     el.appendChild(b);
@@ -1523,30 +1545,48 @@ function renderMonitor(ctx, v) {
   }
   if (difL > deaL) score++;
   rows.push(["MACD " + (difL > deaL ? "多头" : "空头") + cross2, difL > deaL ? UP : DN]);
-  // 5. 待补 FVG 缺口
+  // 5. 待补 FVG 缺口（上方缺口=涨到那里大概率遇压；下方缺口=跌到那里有支撑）
   var ic2 = ictCalc(kl);
   var upG = 0, dnG = 0;
   ic2.fvg.forEach(function (z) { if (z.bot > last) upG++; else if (z.top < last) dnG++; });
-  if (upG || dnG) rows.push(["待补缺口 · 上方×" + upG + " 下方×" + dnG, "#b78cff"]);
+  if (upG || dnG) rows.push(["上方 " + upG +  " 个缺口没补(压力) · 下方 " + dnG + " 个没补(支撑)", "#b78cff"]);
   // 综合评分
   var verdict = score >= total - 0.5 ? "偏多" : (score <= 1 ? "偏空" : "震荡");
   var vc = verdict === "偏多" ? UP : (verdict === "偏空" ? DN : "#d9b45c");
   rows.push(["综合 " + verdict + " " + score + "/" + total, vc]);
-  // 绘制面板
+  // 绘制面板（收起态只一行，点面板展开/收起）
   ctx.font = "10px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  var bx = v.padL + 4, by = v.padT + 44;
+  if (!S.monOpen) {
+    var one = "监测 " + verdict + " " + score + "/" + total + " ▸ 点我展开";
+    var w1 = ctx.measureText(one).width;
+    ctx.fillStyle = "rgba(10,14,11,0.82)";
+    ctx.fillRect(bx, by, w1 + 26, 22);
+    ctx.strokeStyle = vc; ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, w1 + 26, 22);
+    ctx.fillStyle = vc;
+    ctx.beginPath(); ctx.arc(bx + 9, by + 11, 3, 0, 7); ctx.fill();
+    ctx.fillStyle = "#c3d2c6";
+    ctx.fillText(one, bx + 17, by + 11);
+    S.monRect = { x: bx, y: by, w: w1 + 26, h: 22 };
+    return;
+  }
   var bw4 = 0;
   rows.forEach(function (r) { bw4 = Math.max(bw4, ctx.measureText(r[0]).width); });
-  var bx = v.padL + 4, by = v.padT + 44, bh = rows.length * 15 + 10;
+  var bh = rows.length * 15 + 24;
   ctx.fillStyle = "rgba(10,14,11,0.82)";
   ctx.fillRect(bx, by, bw4 + 26, bh);
   ctx.strokeStyle = vc; ctx.lineWidth = 1;
   ctx.strokeRect(bx, by, bw4 + 26, bh);
+  ctx.fillStyle = "#8fa398";
+  ctx.fillText("量化监测 · 再点收起", bx + 8, by + 9);
   rows.forEach(function (r, ri) {
     ctx.fillStyle = r[1];
-    ctx.beginPath(); ctx.arc(bx + 8, by + 13 + ri * 15, 2.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + 8, by + 26 + ri * 15, 2.5, 0, 7); ctx.fill();
     ctx.fillStyle = ri === rows.length - 1 ? r[1] : "#c3d2c6";
-    ctx.fillText(r[0], bx + 16, by + 13 + ri * 15);
+    ctx.fillText(r[0], bx + 16, by + 26 + ri * 15);
   });
+  S.monRect = { x: bx, y: by, w: bw4 + 26, h: bh };
 }
 /* ================= DDX≈ / 主力意愿≈ 副图（与桌面端同口径：东财日级资金流推算） ================= */
 function renderExtraPanes(ctx, v) {
