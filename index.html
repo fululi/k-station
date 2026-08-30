@@ -53,6 +53,12 @@
   .topbar .fresh { font-size: 10px; color: #5d6f64; flex: none; font-variant-numeric: tabular-nums; }
   .topbar .fresh.bad { color: #ff6f66; }
   body.rows-off .row { display: none; }
+  @media (max-width: 480px) {
+    .row { gap: 4px; padding: 4px 8px 2px; }
+    .row .btn { font-size: 11px; padding: 5px 9px; min-height: 28px; border-radius: 5px; }
+    .row .tabbtn { padding: 5px 10px; border-radius: 13px; }
+    .addbox input { width: 76px; font-size: 12px; padding: 5px 7px; }
+  }
   .tabbtn { font-size: 13px; padding: 7px 14px; border-radius: 16px; }
   .tabbtn.on { background: #1a211c; color: #e8f2ea; border-color: #3a4a40; }
   .addbox { display: flex; gap: 4px; flex: none; }
@@ -141,6 +147,7 @@ function txRows(rows) {
 function fetchKlineTX(code, klt, cb) {
   if (isUS(code) && klt !== "101" && klt !== "102") { cb(new Error("美股仅支持日线/周线")); return; }
   var prefix = txPrefix(code);
+  var kA = klt === "5D" ? "5" : klt;
   if (klt === "101" || klt === "102") {
     var per = klt === "101" ? "day" : "week";
     var api2 = isUS(code) ? "usfqkline" : "fqkline";
@@ -151,9 +158,9 @@ function fetchKlineTX(code, klt, cb) {
       cb(null, txRows(rows), "");
     });
   } else {
-    fetchJSON("https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=" + prefix + ",m" + klt + ",,320", function (err, d) {
+    fetchJSON("https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=" + prefix + ",m" + kA + ",,320", function (err, d) {
       var sd = d && d.data && d.data[prefix];
-      var rows = sd && sd["m" + klt];
+      var rows = sd && sd["m" + kA];
       if (err || !rows || !rows.length) { cb(err || new Error("腾讯无分钟K线")); return; }
       cb(null, txRows(rows), "");
     });
@@ -161,6 +168,7 @@ function fetchKlineTX(code, klt, cb) {
 }
 // 东财 JSONP 兜底（腾讯失败时）
 function fetchKlineEM(code, klt, cb) {
+  if (klt === "5D") klt = "5";
   var url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=" + secidOf(code) +
     "&ut=" + UT + "&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56&klt=" + klt + "&fqt=1&end=20500101&lmt=320";
   jsonp(url, function (err, d) {
@@ -283,7 +291,7 @@ function fetchFFlowMin(code, cb) {
   setTimeout(function () { if (!done) lose(); }, 9000);
 }
 /* ================= 状态与持久化 ================= */
-var PERIODS = [["101", "日线"], ["102", "周线"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"]];
+var PERIODS = [["101", "日线"], ["5D", "5日"], ["102", "周线"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"]];
 var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5], ["freedraw", "画笔", 2]];
 var S = {
   codes: [["600105", "永鼎股份"], ["600176", "中国巨石"], ["515880", "通信ETF"]],
@@ -373,7 +381,7 @@ function view() {
   var rtH = S.ind.rtflow && !noFund(S.active) ? Math.round(avail * 0.10) : 0;
   var subN = 2 + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0) + (rtH ? 1 : 0);
   var priceH = avail - volH - macdH - ddxH - zlyyH - rtH - 6 * subN;
-  if (!S.count) S.count = Math.max(30, Math.round(plotW / 6.5));
+  if (!S.count) S.count = S.klt === "5D" ? 240 : Math.max(30, Math.round(plotW / 6.5));
   S.count = Math.max(15, Math.min(250, S.count));
   var i1 = Math.max(Math.min(S.end || n, n), Math.min(S.count, n));
   var i0 = Math.max(0, i1 - Math.min(S.count, n));
@@ -744,9 +752,13 @@ function draw() {
     ctx.beginPath();
     var tStarted = false;
     for (var ti = i0; ti < i1; ti++) {
-      var tx2 = v.X(ti), ty2 = v.Y(kl[ti][4]);
-      if (!tStarted) { ctx.moveTo(tx2, ty2); tStarted = true; }
-      else ctx.lineTo(tx2, ty2);
+      var kb = kl[ti];
+      var seq = kb[4] >= kb[1] ? [kb[1], kb[3], kb[2], kb[4]] : [kb[1], kb[2], kb[3], kb[4]];
+      for (var si = 0; si < 4; si++) {
+        var tx2 = v.X(ti), ty2 = v.Y(seq[si]);
+        if (!tStarted) { ctx.moveTo(tx2, ty2); tStarted = true; }
+        else ctx.lineTo(tx2, ty2);
+      }
     }
     ctx.stroke();
     // 最新价端点
@@ -1630,21 +1642,21 @@ function renderDailyLevels(ctx, v) {
   var pre2 = byWeek ? "本周" : (S.klt === "102" ? "本周" : "今");
   // 先画线、收集标签，再统一防重叠放置（上下最小间隔 13px）
   var labels = [];
-  function lv(p, col, dash, lbl) {
+  function lv(p, col, dash, lbl, lw) {
     var y = v.Y(p);
     if (y < v.padT - 2 || y > v.padT + v.priceH + 2) return;
-    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash);
+    ctx.strokeStyle = col; ctx.lineWidth = lw || 1; ctx.setLineDash(dash);
     ctx.beginPath(); ctx.moveTo(v.padL, y); ctx.lineTo(right, y); ctx.stroke();
     ctx.setLineDash([]);
     labels.push({ y: y, t: lbl + " " + p.toFixed(d2), c: col });
   }
   if (S.ind.pdhl) {
-    lv(prev.hi, "#ff9a5c", [5, 4], pre + "高");
-    lv(prev.lo, "#3fd6c2", [5, 4], pre + "低");
+    lv(prev.hi, "#ffb14d", [5, 4], pre + "高");
+    lv(prev.lo, "#4de3c2", [5, 4], pre + "低");
   }
   if (S.ind.tdhl) {
-    lv(today.hi, "rgba(255,111,102,0.75)", [2, 3], pre2 + "高");
-    lv(today.lo, "rgba(53,217,154,0.75)", [2, 3], pre2 + "低");
+    lv(today.hi, "#ff5252", [], pre2 + "高", 1.6);
+    lv(today.lo, "#2ee68a", [], pre2 + "低", 1.6);
   }
   labels.sort(function (a, b) { return a.y - b.y; });
   for (var li3 = 1; li3 < labels.length; li3++) {
@@ -1652,6 +1664,9 @@ function renderDailyLevels(ctx, v) {
   }
   ctx.font = "9px Menlo, monospace"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
   labels.forEach(function (L2) {
+    var tw3 = ctx.measureText(L2.t).width;
+    ctx.fillStyle = "rgba(10,14,11,0.85)";
+    ctx.fillRect(right - 3 - tw3 - 6, L2.y - 12, tw3 + 6, 12);
     ctx.fillStyle = L2.c;
     ctx.fillText(L2.t, right - 3, L2.y - 1);
   });
