@@ -558,7 +558,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     if (t === "buy") { ctx.strokeStyle = sel ? SEL : "#ffd21f"; ctx.lineWidth = sel ? 2.4 : 1.8; }
     ctx.beginPath(); ctx.moveTo(v.padL, pts[0].y); ctx.lineTo(right, pts[0].y); ctx.stroke();
     ctx.fillStyle = t === "buy" ? (sel ? SEL : "#ffd21f") : ctx.fillStyle;
-    ctx.fillText((t === "buy" ? "买 " : "") + fwp(dg.pts[0].p), right - 52, pts[0].y - 7);
+    ctx.fillText((dg.tag ? dg.tag + " " : (t === "buy" ? "买 " : "")) + fwp(dg.pts[0].p), right - 52, pts[0].y - 7);
   }
   else if (t === "rect") {
     var x0 = Math.min(pts[0].x, pts[1].x), x1 = Math.max(pts[0].x, pts[1].x);
@@ -1502,15 +1502,22 @@ function loadAll(reset) {
     if (err) { setFresh(false); hint("K线加载失败：" + err.message + " · 点「刷新」重试 <span class=dim>（检查网络）</span>"); draw(); return; }
     var atEnd = !S.kl.length || S.end >= S.kl.length;
     S.kl = kl;
-    if (name) S.name = name;
+    if (name) {
+      S.name = name;
+      for (var ci = 0; ci < S.codes.length; ci++) {
+        if (S.codes[ci][0] === S.active && S.codes[ci][1] !== name) { S.codes[ci][1] = name; store(); buildTabs(); break; }
+      }
+    }
     if (atEnd || reset) S.end = kl.length;
     if (S.urlLines) {
       var d0 = kl[kl.length - 1][0], dl2 = dlist(), chg = false;
-      S.urlLines.forEach(function (pv) {
+      S.urlLines.forEach(function (it) {
         for (var j = 0; j < dl2.length; j++) {
-          if (dl2[j].type === "hline" && Math.abs(dl2[j].pts[0].p - pv) / pv < 0.001) return;
+          if (dl2[j].type === "hline" && Math.abs(dl2[j].pts[0].p - it.p) / it.p < 0.001) return;
         }
-        dl2.push({ type: "hline", pts: [{ d: d0, p: pv }] }); chg = true;
+        var hl = { type: "hline", pts: [{ d: d0, p: it.p }] };
+        if (it.tag) hl.tag = it.tag;
+        dl2.push(hl); chg = true;
       });
       S.urlLines = null;
       if (chg) store();
@@ -1523,7 +1530,12 @@ function loadAll(reset) {
   fetchQuote(S.active, function (err, q) {
     if (!err && q) {
       S.quote = q;
-      if (q.name) S.name = q.name;
+      if (q.name) {
+        S.name = q.name;
+        for (var ci = 0; ci < S.codes.length; ci++) {
+          if (S.codes[ci][0] === S.active && S.codes[ci][1] !== q.name) { S.codes[ci][1] = q.name; store(); buildTabs(); break; }
+        }
+      }
       if (q.floatMV) S.floatMV = q.floatMV;
       syncTop();
     }
@@ -2167,7 +2179,10 @@ function applyUrl() {
     var lines = q.get("lines");
     if (lines) {
       var arr = [];
-      lines.split(",").forEach(function (s2) { var pv = parseFloat(s2); if (pv > 0) arr.push(pv); });
+      lines.split(",").forEach(function (s2) {
+        var m2 = /^([bs])?([\d.]+)$/.exec(s2.trim());
+        if (m2 && parseFloat(m2[2]) > 0) arr.push({ p: parseFloat(m2[2]), tag: m2[1] === "b" ? "低吸" : (m2[1] === "s" ? "高抛" : "") });
+      });
       if (arr.length) S.urlLines = arr;
     }
     if (code || lines) store();
