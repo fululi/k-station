@@ -68,8 +68,9 @@
   }
   #chartwrap { flex: 1; position: relative; min-height: 0; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-  .yz { position: absolute; right: 62px; top: 16%; display: flex; flex-direction: column; gap: 10px; z-index: 5; }
-  .yz button { width: 38px; height: 38px; border-radius: 19px; background: rgba(16,22,18,0.82); color: #d9b45c; border: 1px solid #3a4a40; font-size: 13px; font-weight: 700; }
+  .yz { position: absolute; right: 62px; top: 16%; display: flex; flex-direction: column; gap: 6px; z-index: 5; opacity: .55; }
+  .yz button { width: 26px; height: 26px; border-radius: 13px; background: rgba(16,22,18,0.6); color: #d9b45c; border: 1px solid #3a4a40; font-size: 10px; font-weight: 700; padding: 0; }
+  .yz button:active { opacity: 1; }
   .hint {
     flex: none; font-size: 11.5px; color: #d9b45c; padding: 5px 10px;
     padding-bottom: calc(6px + env(safe-area-inset-bottom));
