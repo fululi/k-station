@@ -80,6 +80,7 @@
     position: absolute; top: 6px; right: 8px; font-size: 10px; color: #4a5a50;
     pointer-events: none; text-align: right; line-height: 1.5;
   }
+  .lnkb { font-size: 10px; color: #8fa398; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -88,6 +89,7 @@
   <span class="name" data-name>—</span>
   <span class="px flat" data-px>—</span>
   <span class="pct flat" data-pct>—</span>
+  <span class="lnkb" data-lnk></span>
   <span class="spacer"></span>
   <span class="fresh" data-fresh></span>
   <button class="btn" onclick="location.href='https://fululi.github.io/hq-mobile/'" type="button">持仓</button>
@@ -1494,6 +1496,16 @@ function syncTools() {
 function syncTop() {
   var q = S.quote;
   document.querySelector("[data-name]").textContent = S.name || S.active;
+  var lkEl = document.querySelector("[data-lnk]");
+  if (lkEl) {
+    var ls = "";
+    try {
+      var _l = JSON.parse(localStorage.getItem("hqm_lnk_v1") || "null");
+      var L2 = _l && _l.lnk && (_l.lnk[S.active] || _l.lnk["sh" + S.active] || _l.lnk["sz" + S.active]);
+      if (L2) ls = "跟" + L2.i + " r" + L2.r + ((L2.ad || L2.au) ? "·极端×" + (L2.ad || L2.au) : "");
+    } catch (e) {}
+    lkEl.textContent = ls;
+  }
   var pxEl = document.querySelector("[data-px]"), pctEl = document.querySelector("[data-pct]");
   if (q) {
     pxEl.textContent = fwp(q.price);
