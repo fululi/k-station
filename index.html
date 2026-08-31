@@ -1540,7 +1540,7 @@ function loadAll(reset) {
       var d0 = kl[kl.length - 1][0], dl2 = dlist(), chg = false;
       // 自动价位线（hq-mobile 跳传来的低吸/高抛线）整组替换：先清旧自动线再画新线，不随刷新/重进堆积
       for (var aj = dl2.length - 1; aj >= 0; aj--) {
-        if (dl2[aj].type === "hline" && (dl2[aj].auto || dl2[aj].tag === "低吸" || dl2[aj].tag === "高抛")) { dl2.splice(aj, 1); chg = true; }
+        if (dl2[aj].type === "hline" && (dl2[aj].auto || (dl2[aj].tag && (dl2[aj].tag.indexOf("低吸") === 0 || dl2[aj].tag.indexOf("高抛") === 0)))) { dl2.splice(aj, 1); chg = true; }
       }
       S.urlLines.forEach(function (it) {
         var hl = { type: "hline", pts: [{ d: d0, p: it.p }], auto: true };
@@ -2239,6 +2239,14 @@ function applyUrl() {
       lines.split(",").forEach(function (s2) {
         var m2 = /^([bs])?([\d.]+)$/.exec(s2.trim());
         if (m2 && parseFloat(m2[2]) > 0) arr.push({ p: parseFloat(m2[2]), tag: m2[1] === "b" ? "低吸" : (m2[1] === "s" ? "高抛" : "") });
+      });
+      // 同侧多档时按传来顺序编 ①②③，与 hq-mobile 持仓卡序号一致
+      var nB = 0, nS = 0;
+      arr.forEach(function (it) { if (it.tag === "低吸") nB++; else if (it.tag === "高抛") nS++; });
+      var iB = 0, iS = 0, ORD = "①②③";
+      arr.forEach(function (it) {
+        if (it.tag === "低吸") { if (nB > 1 && ORD[iB]) it.tag += ORD[iB]; iB++; }
+        else if (it.tag === "高抛") { if (nS > 1 && ORD[iS]) it.tag += ORD[iS]; iS++; }
       });
       if (arr.length) S.urlLines = arr;
     }
