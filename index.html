@@ -575,10 +575,18 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     var tag0 = dg.tag || "";
     var lc = tag0.indexOf("低吸") === 0 ? "#35d99a" : (tag0.indexOf("高抛") === 0 ? "#ff6f66" : "#e6b43c");
     if (t === "buy") { ctx.strokeStyle = sel ? SEL : "#ffd21f"; ctx.lineWidth = sel ? 2.4 : 1.8; }
-    else if (tag0) { ctx.strokeStyle = sel ? SEL : lc; ctx.fillStyle = sel ? SEL : lc; ctx.lineWidth = sel ? 2.4 : 1.8; }
+    else if (tag0) { ctx.strokeStyle = sel ? SEL : lc; ctx.lineWidth = sel ? 2.4 : 1.8; }
     ctx.beginPath(); ctx.moveTo(v.padL, pts[0].y); ctx.lineTo(right, pts[0].y); ctx.stroke();
-    ctx.fillStyle = t === "buy" ? (sel ? SEL : "#ffd21f") : ctx.fillStyle;
-    ctx.fillText((dg.tag ? dg.tag + " " : (t === "buy" ? "买 " : "")) + fwp(dg.pts[0].p), right - 52, (dg._ly != null ? dg._ly : pts[0].y) - 7);
+    // 标签放左缘深色胶囊(右缘留给昨/今高低), 加粗放大, 不再被裁切
+    var lab = (dg.tag ? dg.tag + " " : (t === "buy" ? "买 " : "")) + fwp(dg.pts[0].p);
+    var ly = (dg._ly != null ? dg._ly : pts[0].y);
+    ctx.font = "bold 11px -apple-system, sans-serif";
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    var tw = ctx.measureText(lab).width;
+    ctx.fillStyle = "rgba(8,12,10,0.85)";
+    ctx.fillRect(v.padL + 3, ly - 13, tw + 10, 16);
+    ctx.fillStyle = sel ? SEL : (t === "buy" ? "#ffd21f" : lc);
+    ctx.fillText(lab, v.padL + 8, ly - 5);
   }
   else if (t === "rect") {
     var x0 = Math.min(pts[0].x, pts[1].x), x1 = Math.max(pts[0].x, pts[1].x);
@@ -1907,8 +1915,8 @@ function renderDailyLevels(ctx, v) {
   }
   if (showToday) {
     lv(today.o, "rgba(228,237,230,0.55)", S.ind.solid ? [] : [3, 3], "今开");
-    lv(today.hi, "#ff5252", [], pre2 + "高", 1.6);
-    lv(today.lo, "#2ee68a", [], pre2 + "低", 1.6);
+    lv(today.hi, "#ffd21f", [], pre2 + "高", 1.6);
+    lv(today.lo, "#57a7ff", [], pre2 + "低", 1.6);
     lv(today.c, "#e8f2ea", [], "最新", 1.4);
   }
   labels.sort(function (a, b) { return a.y - b.y; });
