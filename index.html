@@ -572,10 +572,13 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     drawSeg(ctx, pts[0], { x: right + 80, y: yEnd });
   }
   else if (t === "hline" || t === "buy") {
+    var tag0 = dg.tag || "";
+    var lc = tag0.indexOf("低吸") === 0 ? "#35d99a" : (tag0.indexOf("高抛") === 0 ? "#ff6f66" : "#e6b43c");
     if (t === "buy") { ctx.strokeStyle = sel ? SEL : "#ffd21f"; ctx.lineWidth = sel ? 2.4 : 1.8; }
+    else if (tag0) { ctx.strokeStyle = sel ? SEL : lc; ctx.fillStyle = sel ? SEL : lc; ctx.lineWidth = sel ? 2.4 : 1.8; }
     ctx.beginPath(); ctx.moveTo(v.padL, pts[0].y); ctx.lineTo(right, pts[0].y); ctx.stroke();
     ctx.fillStyle = t === "buy" ? (sel ? SEL : "#ffd21f") : ctx.fillStyle;
-    ctx.fillText((dg.tag ? dg.tag + " " : (t === "buy" ? "买 " : "")) + fwp(dg.pts[0].p), right - 52, pts[0].y - 7);
+    ctx.fillText((dg.tag ? dg.tag + " " : (t === "buy" ? "买 " : "")) + fwp(dg.pts[0].p), right - 52, (dg._ly != null ? dg._ly : pts[0].y) - 7);
   }
   else if (t === "rect") {
     var x0 = Math.min(pts[0].x, pts[1].x), x1 = Math.max(pts[0].x, pts[1].x);
@@ -684,7 +687,24 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
 function renderDrawings(ctx, v) {
   var im = idxMap(v);
   var dl = dlist();
+  // 水平线标签防重叠: 同簇标签按竖向位置排序后错开(最小间距13px),仅影响文字位置不动线
+  var hls = [];
+  for (var hi = 0; hi < dl.length; hi++) {
+    var d2 = dl[hi];
+    if ((d2.type === "hline" || d2.type === "buy") && d2.pts && d2.pts.length) {
+      var q2 = anchorXY(v, im, d2.pts[0]);
+      if (q2) hls.push({ d: d2, y: q2.y });
+    }
+  }
+  hls.sort(function (a, b) { return a.y - b.y; });
+  var yMax = v.pTop + v.priceH - 8;
+  for (var hj = 0; hj < hls.length; hj++) {
+    if (hj > 0 && hls[hj].y - hls[hj - 1].y < 13) hls[hj].y = hls[hj - 1].y + 13;
+    hls[hj].y = Math.min(hls[hj].y, yMax);
+  }
+  hls.forEach(function (h2) { h2.d._ly = h2.y; });
   for (var i = 0; i < dl.length; i++) renderOneDrawing(ctx, v, im, dl[i], i === S.selected);
+  hls.forEach(function (h2) { delete h2.d._ly; });
   // 进行中的画线：已落锚点 + 跟随手指的虚影
   if (S.tool && S.pending.length) {
     var need = 2;
