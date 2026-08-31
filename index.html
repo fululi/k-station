@@ -1838,8 +1838,9 @@ function weekKey(ds) {
   return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
 }
 function renderDailyLevels(ctx, v) {
-  if (S.pdhlMode === "off") return;
-  if (!S.ind.pdhl && !S.ind.tdhl) return;
+  var showPrev = S.pdhlMode !== "off";   // 昨高/昨低（含周模式）独立开关
+  var showToday = !!S.ind.tdhl;          // 今开/今高/今低/最新 独立开关
+  if (!showPrev && !showToday) return;
   var kl = S.kl, n = kl.length;
   if (n < 3) return;
   var byWeek = S.pdhlMode === "week";
@@ -1851,7 +1852,8 @@ function renderDailyLevels(ctx, v) {
     if (kl[i][3] < cur.lo) cur.lo = kl[i][3];
     cur.c = kl[i][4];
   }
-  if (g.length < 2) return;
+  if (showPrev && g.length < 2) showPrev = false;
+  if (!showPrev && !showToday) return;
   var prev = g[g.length - 2], today = g[g.length - 1];
   var right = v.padL + (v.i1 - v.i0) * v.step;
   var d2 = dec();
@@ -1867,11 +1869,11 @@ function renderDailyLevels(ctx, v) {
     ctx.setLineDash([]);
     labels.push({ y: y, t: lbl + " " + p.toFixed(d2), c: col });
   }
-  if (S.ind.pdhl) {
+  if (showPrev) {
     lv(prev.hi, "#ffb14d", S.ind.solid ? [] : [5, 4], pre + "高");
     lv(prev.lo, "#4de3c2", S.ind.solid ? [] : [5, 4], pre + "低");
   }
-  if (S.ind.tdhl) {
+  if (showToday) {
     lv(today.o, "rgba(228,237,230,0.55)", S.ind.solid ? [] : [3, 3], "今开");
     lv(today.hi, "#ff5252", [], pre2 + "高", 1.6);
     lv(today.lo, "#2ee68a", [], pre2 + "低", 1.6);
@@ -1890,7 +1892,7 @@ function renderDailyLevels(ctx, v) {
     ctx.fillText(L2.t, right - 3, L2.y - 1);
   });
   // LuxAlgo 风格：把上一周期的整根蜡烛画在图表左缘（影线+实体），一眼看上个日/周的范围和方向
-  if (S.ind.pdhl) {
+  if (showPrev) {
     var gx = v.padL + 16, gw2 = 5;
     var yH = v.Y(prev.hi), yL = v.Y(prev.lo), yO = v.Y(prev.o), yC = v.Y(prev.c);
     if (yH > v.pTop - 6 && yL < v.pTop + v.priceH + 6) {
@@ -1997,9 +1999,10 @@ function renderMonitor(ctx, v) {
   var g = [], cur = null;
   for (var i = 0; i < n; i++) {
     var dk = kl[i][0].slice(0, 10);
-    if (!cur || cur.k !== dk) { cur = { k: dk, hi: -1e18, lo: 1e18 }; g.push(cur); }
+    if (!cur || cur.k !== dk) { cur = { k: dk, o: kl[i][1], hi: -1e18, lo: 1e18, c: kl[i][4] }; g.push(cur); }
     if (kl[i][2] > cur.hi) cur.hi = kl[i][2];
     if (kl[i][3] < cur.lo) cur.lo = kl[i][3];
+    cur.c = kl[i][4];
   }
   if (g.length >= 2) {
     total++;
@@ -2010,6 +2013,25 @@ function renderMonitor(ctx, v) {
     else { t2 = "昨高下方 " + (last / pv.hi * 100 - 100).toFixed(1) + "% · 昨低上方 +" + (last / pv.lo * 100 - 100).toFixed(1) + "%"; c2 = "#d9b45c"; score += 0.5; }
     rows.push(["昨低 " + pv.lo.toFixed(dec()) + " ~ 昨高 " + pv.hi.toFixed(dec()), "#8fa398"]);
     rows.push([t2, c2]);
+    // 枢轴点（经典口径：P=(昨高+昨低+昨收)/3，R1=2P−昨低，S1=2P−昨高）
+    var P2 = (pv.hi + pv.lo + pv.c) / 3, R1 = 2 * P2 - pv.lo, S1v = 2 * P2 - pv.hi;
+    var r1t = last >= R1 ? "已上破" : "距 +" + (R1 / last * 100 - 100).toFixed(1) + "%";
+    var s1t = last <= S1v ? "已下破" : "距 -" + (100 - S1v / last * 100).toFixed(1) + "%";
+    rows.push(["枢轴 R1 " + R1.toFixed(dec()) + "(" + r1t + ") · S1 " + S1v.toFixed(dec()) + "(" + s1t + ")", "#8fa398"]);
+    // ATR14 用量：今日已走振幅 / 日级ATR14（按日聚合计算，分钟周期同样准确）
+    var dg2 = g.slice(-16);
+    if (dg2.length >= 16) {
+      var trS = 0;
+      for (var a2 = dg2.length - 15; a2 < dg2.length - 1; a2++) {
+        var pc2 = dg2[a2 - 1].c;
+        trS += Math.max(dg2[a2].hi - dg2[a2].lo, Math.abs(dg2[a2].hi - pc2), Math.abs(dg2[a2].lo - pc2));
+      }
+      var atrM = trS / 14, tdy = g[g.length - 1];
+      if (atrM > 0) {
+        var use = (tdy.hi - tdy.lo) / atrM * 100;
+        rows.push(["今日振幅已走 " + (tdy.hi - tdy.lo).toFixed(dec()) + " 元 · ATR14用量 " + Math.round(use) + "%" + (use >= 80 ? "（波幅配额已用大半）" : ""), use >= 80 ? "#d9b45c" : "#8fa398"]);
+      }
+    }
   }
   // 3. 主力资金（今日累计 + 近30分钟动向）
   total++;
@@ -2145,7 +2167,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "EMA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["pdhl", "昨高低"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"], ["paneTop", "副图上置"]];
+var INDS = [["ma", "EMA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"], ["paneTop", "副图上置"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
@@ -2158,7 +2180,7 @@ function buildInds() {
   pb.addEventListener("click", function () {
     S.pdhlMode = S.pdhlMode === "day" ? "week" : (S.pdhlMode === "week" ? "off" : "day");
     store(); buildInds(); draw();
-    hint(S.pdhlMode === "off" ? "昨高昨低已关闭" : (S.pdhlMode === "week" ? "显示上周高/低 + 上周蜡烛" : "显示昨日高/低 + 昨日蜡烛"));
+    hint(S.pdhlMode === "off" ? "昨高昨低已关闭 · 今高今低由「今高低」钮独立控制" : (S.pdhlMode === "week" ? "显示上周高/低 + 上周蜡烛" : "显示昨日高/低 + 昨日蜡烛"));
   });
   el.appendChild(pb);
   INDS.forEach(function (t) {
