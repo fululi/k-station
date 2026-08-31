@@ -68,6 +68,8 @@
   }
   #chartwrap { flex: 1; position: relative; min-height: 0; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  .yz { position: absolute; right: 62px; top: 16%; display: flex; flex-direction: column; gap: 10px; z-index: 5; }
+  .yz button { width: 38px; height: 38px; border-radius: 19px; background: rgba(16,22,18,0.82); color: #d9b45c; border: 1px solid #3a4a40; font-size: 13px; font-weight: 700; }
   .hint {
     flex: none; font-size: 11.5px; color: #d9b45c; padding: 5px 10px;
     padding-bottom: calc(6px + env(safe-area-inset-bottom));
@@ -98,6 +100,7 @@
 <div class="row seps" data-inds></div>
 <div id="chartwrap">
   <canvas data-chart></canvas>
+  <div class="yz"><button type="button" data-yzin>纵＋</button><button type="button" data-yzout>纵－</button></div>
 </div>
 <details id="icthelp">
   <summary>📖 图上标注都是啥意思（点我展开）</summary>
@@ -500,8 +503,8 @@ function anchorXY(v, im, a) {
   if (i == null) return null;
   return { x: v.X(i), y: v.Y(a.p), i: i };
 }
-var FIB_R = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.272, 1.618];
-var FIB_C = { "0": "#d5e0d8", "0.236": "#7cc0ff", "0.382": "#4af0d8", "0.5": "#d3a6ff", "0.618": "#ffd21f", "0.786": "#ffb066", "1": "#ff8078", "1.272": "#ff74a3", "1.618": "#f577e6" };
+var FIB_R = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.272, 1.618, 2.618];
+var FIB_C = { "0": "#d5e0d8", "0.236": "#7cc0ff", "0.382": "#4af0d8", "0.5": "#d3a6ff", "0.618": "#ffd21f", "0.786": "#ffb066", "1": "#ff8078", "1.272": "#ff74a3", "1.618": "#f577e6", "2.618": "#c678dd" };
 function ptsOf(v, im, pts) {
   var out = [];
   for (var k = 0; k < pts.length; k++) {
@@ -1130,7 +1133,7 @@ cv.addEventListener("touchmove", function (e) {
   }
   var pt = posT(e.touches[0]);
   if (T.mode === "yzoom") {
-    S.yZoom = Math.max(0.3, Math.min(6, T.z0 * (1 + (T.ly - pt.y) * 0.005)));
+    S.yZoom = Math.max(0.3, Math.min(6, T.z0 * (1 + (T.ly - pt.y) * 0.008)));
     draw();
     return;
   }
@@ -1256,7 +1259,7 @@ cv.addEventListener("mousemove", function (e) {
     return;
   }
   if (M.yzoom) {
-    S.yZoom = Math.max(0.3, Math.min(6, M.z0 * (1 + (M.ly - pt.y) * 0.005)));
+    S.yZoom = Math.max(0.3, Math.min(6, M.z0 * (1 + (M.ly - pt.y) * 0.008)));
     draw();
     return;
   }
@@ -1523,11 +1526,12 @@ function loadAll(reset) {
     if (atEnd || reset) S.end = kl.length;
     if (S.urlLines) {
       var d0 = kl[kl.length - 1][0], dl2 = dlist(), chg = false;
+      // 自动价位线（hq-mobile 跳传来的低吸/高抛线）整组替换：先清旧自动线再画新线，不随刷新/重进堆积
+      for (var aj = dl2.length - 1; aj >= 0; aj--) {
+        if (dl2[aj].type === "hline" && (dl2[aj].auto || dl2[aj].tag === "低吸" || dl2[aj].tag === "高抛")) { dl2.splice(aj, 1); chg = true; }
+      }
       S.urlLines.forEach(function (it) {
-        for (var j = 0; j < dl2.length; j++) {
-          if (dl2[j].type === "hline" && Math.abs(dl2[j].pts[0].p - it.p) / it.p < 0.001) return;
-        }
-        var hl = { type: "hline", pts: [{ d: d0, p: it.p }] };
+        var hl = { type: "hline", pts: [{ d: d0, p: it.p }], auto: true };
         if (it.tag) hl.tag = it.tag;
         dl2.push(hl); chg = true;
       });
@@ -1564,6 +1568,8 @@ function inSession() {
   return (m >= 570 && m <= 690) || (m >= 780 && m <= 905);
 }
 document.querySelector("[data-refresh]").addEventListener("click", function () { loadAll(false); });
+document.querySelector("[data-yzin]").addEventListener("click", function () { S.yZoom = Math.min(6, (S.yZoom || 1) * 1.35); store(); draw(); hint("纵向放大 ×" + S.yZoom.toFixed(2) + " · 双击价格轴复位"); });
+document.querySelector("[data-yzout]").addEventListener("click", function () { S.yZoom = Math.max(0.3, (S.yZoom || 1) / 1.35); store(); draw(); hint("纵向缩小 ×" + S.yZoom.toFixed(2) + " · 双击价格轴复位"); });
 // 顶部工具行折叠/展开（手机省屏）
 function syncCollapse() {
   document.body.classList.toggle("rows-off", S.collapsed);
@@ -2209,7 +2215,7 @@ restore();
 applyUrl();
 buildTabs(); buildPeriods(); buildTools(); buildInds(); syncCollapse();
 loadAll(true);
-hint("<span class=dim>拖动平移(上下左右) · 双指缩放 · 右侧价格轴上下拖=纵向缩放(双击复位) · 长按十字线 · 点工具画线 · 按住画线拖动 ｜ 东财公开数据有延迟 · 画线存本机 · 非投资建议</span>");
+hint("<span class=dim>拖动平移(上下左右) · 双指缩放 · 「纵＋/纵－」一键纵向缩放(双击价格轴复位) · 长按十字线 · 点工具画线 · 按住画线拖动 ｜ 东财公开数据有延迟 · 画线存本机 · 非投资建议</span>");
 </script>
 </body>
 </html>
