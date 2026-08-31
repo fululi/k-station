@@ -20,7 +20,7 @@
     overflow: hidden; user-select: none; -webkit-user-select: none;
   }
   .topbar {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px 4px;
+    display: flex; align-items: center; gap: 8px; row-gap: 4px; flex-wrap: wrap; padding: 8px 10px 4px;
     padding-top: calc(8px + env(safe-area-inset-top));
     border-bottom: 1px solid #1d2822; flex: none;
   }
@@ -30,6 +30,8 @@
   .topbar .pct { font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
   .up { color: #ff6f66; } .down { color: #35d99a; } .flat { color: #a9bcb0; }
   .topbar .spacer { flex: 1; }
+  .topbar .lnkb { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .btn:first-of-type { margin-left: auto; }
   .topbar .btn { padding: 6px 8px; min-height: 30px; font-size: 12px; flex: none; }
   @media (max-width: 400px) {
     .topbar .brand { font-size: 8px; letter-spacing: 0; }
