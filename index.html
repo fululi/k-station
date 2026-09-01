@@ -52,6 +52,8 @@
   .row::-webkit-scrollbar { display: none; }
   .row .btn { flex: none; white-space: nowrap; }
   .row.seps { padding-top: 2px; }
+  .rsep { flex: none; width: 1px; background: #30433a; margin: 2px 3px; align-self: stretch; }
+  .btn.rgb { color: #8fb3a2; }
   .topbar .fresh { font-size: 10px; color: #5d6f64; flex: none; font-variant-numeric: tabular-nums; }
   .topbar .fresh.bad { color: #ff6f66; }
   body.rows-off .row { display: none; }
@@ -166,11 +168,11 @@ function txRows(rows) {
   }).filter(function (r) { return r[4] > 0; });
 }
 function fetchKlineTX(code, klt, cb) {
-  if (isUS(code) && klt !== "101" && klt !== "102") { cb(new Error("美股仅支持日线/周线")); return; }
+  if (isUS(code) && klt !== "101" && klt !== "102" && klt !== "103") { cb(new Error("美股仅支持日/周/月线")); return; }
   var prefix = txPrefix(code);
   var kA = klt === "5D" ? "5" : klt;
-  if (klt === "101" || klt === "102") {
-    var per = klt === "101" ? "day" : "week";
+  if (klt === "101" || klt === "102" || klt === "103") {
+    var per = klt === "101" ? "day" : (klt === "102" ? "week" : "month");
     var api2 = isUS(code) ? "usfqkline" : "fqkline";
     fetchJSON("https://web.ifzq.gtimg.cn/appstock/app/" + api2 + "/get?param=" + prefix + "," + per + ",,,320,qfq", function (err, d) {
       var sd = d && d.data && d.data[prefix];
@@ -319,7 +321,7 @@ function fetchFFlowMin(code, cb) {
   setTimeout(function () { if (!done) lose(); }, 9000);
 }
 /* ================= 状态与持久化 ================= */
-var PERIODS = [["101", "日线"], ["5D", "5日"], ["102", "周线"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"]];
+var PERIODS = [["101", "日线"], ["5D", "5日"], ["102", "周线"], ["103", "月线"], ["60", "60分"], ["30", "30分"], ["15", "15分"], ["5", "5分"], ["1", "1分"]];
 var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5], ["freedraw", "画笔", 2], ["lrchan", "画回归", 2], ["buy", "买点线", 1], ["priceline", "价线", 0]];
 var S = {
   codes: [["600105", "永鼎股份"], ["600176", "中国巨石"], ["515880", "通信ETF"]],
@@ -425,7 +427,7 @@ function view() {
   var subN = (volH ? 1 : 0) + (macdH ? 1 : 0) + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0) + (rtH ? 1 : 0);
   var priceH = avail - volH - macdH - ddxH - zlyyH - rtH - 6 * subN;
   if (!S.count) S.count = S.klt === "5D" ? 240 : Math.max(30, Math.round(plotW / 6.5));
-  S.count = Math.max(15, Math.min(250, S.count));
+  S.count = Math.max(15, Math.min(400, S.count));
   var i1 = Math.max(Math.min(S.end || n, n), Math.min(S.count, n));
   var i0 = Math.max(0, i1 - Math.min(S.count, n));
   S.end = i1;
@@ -771,7 +773,7 @@ function draw() {
     ctx.strokeStyle = GRID; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(v.X(di), v.pTop); ctx.lineTo(v.X(di), v.bottom); ctx.stroke();
     var ds = kl[di][0];
-    ds = S.klt === "101" ? ds.slice(5) : (S.klt === "102" ? ds.slice(2, 7) : ds.slice(5, 16));
+    ds = S.klt === "101" ? ds.slice(5) : (S.klt === "102" ? ds.slice(2, 7) : (S.klt === "103" ? ds.slice(0, 7) : ds.slice(5, 16)));
     ctx.fillStyle = DIM;
     ctx.fillText(ds, v.X(di), v.hh - 9);
   }
@@ -1448,6 +1450,15 @@ function buildTabs() {
   box.appendChild(inp); box.appendChild(add);
   el.appendChild(box);
 }
+// 视图时间范围预设(随周期自适应),对标 TradingView 的 1M/3M/6M/1Y 快捷键
+function rangesFor(klt) {
+  if (klt === "101") return [["1月", 21], ["3月", 63], ["6月", 126], ["1年", 250], ["全", 0]];
+  if (klt === "102") return [["6月", 26], ["1年", 52], ["3年", 156], ["全", 0]];
+  if (klt === "103") return [["1年", 12], ["3年", 36], ["5年", 60], ["全", 0]];
+  if (klt === "5D")  return [["1日", 48], ["2日", 96], ["5日", 240], ["全", 0]];
+  var m = +klt || 5, d = Math.max(16, Math.round(240 / m));
+  return [["半日", Math.max(15, Math.round(d / 2))], ["1日", d], ["3日", d * 3], ["全", 0]];
+}
 function buildPeriods() {
   var el = document.querySelector("[data-periods]");
   el.innerHTML = "";
@@ -1471,6 +1482,19 @@ function buildPeriods() {
       store(); buildPeriods(); loadAll(true);
     });
     el.appendChild(b);
+  });
+  var sep = document.createElement("span"); sep.className = "rsep"; el.appendChild(sep);
+  rangesFor(S.klt).forEach(function (r) {
+    var rb = document.createElement("button");
+    rb.className = "btn tabbtn rgb"; rb.type = "button"; rb.textContent = r[0];
+    rb.addEventListener("click", function () {
+      var n = S.kl.length; if (!n) return;
+      S.count = r[1] ? Math.min(r[1], n) : n;
+      S.end = n; S.yZoom = 1; S.yOff = 0;
+      store(); draw();
+      hint("范围 " + r[0] + " · " + Math.min(S.count, n) + "根K线");
+    });
+    el.appendChild(rb);
   });
 }
 function buildTools() {
