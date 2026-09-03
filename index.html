@@ -57,6 +57,7 @@
   .topbar .fresh { font-size: 10px; color: #5d6f64; flex: none; font-variant-numeric: tabular-nums; }
   .topbar .fresh.bad { color: #ff6f66; }
   body.rows-off .row { display: none; }
+  body.tools-off .row[data-tools], body.tools-off .row[data-inds] { display: none; }
   @media (max-width: 480px) {
     .row { gap: 4px; padding: 4px 8px 2px; }
     .row .btn { font-size: 11px; padding: 5px 9px; min-height: 28px; border-radius: 5px; }
@@ -98,7 +99,7 @@
   <span class="spacer"></span>
   <span class="fresh" data-fresh></span>
   <button class="btn" onclick="location.href='https://fululi.github.io/hq-mobile/'" type="button">持仓</button>
-  <button class="btn" data-refresh type="button">刷新</button>
+  <button class="btn" data-tooltog type="button">工具▾</button><button class="btn" data-refresh type="button">刷新</button>
   <button class="btn" data-collapse type="button">收起▲</button>
 </div>
 <div class="row" data-tabs></div>
@@ -337,7 +338,7 @@ var S = {
 var DRAW = {}; // "code:klt" -> [{type, pts:[{i,p}...]}]
 function store() {
   try {
-    localStorage.setItem("ksm_v1", JSON.stringify({ v: 3, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed }));
+    localStorage.setItem("ksm_v1", JSON.stringify({ v: 3, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed, toolsOff: S.toolsOff }));
   } catch (e) {}
 }
 function restore() {
@@ -353,6 +354,7 @@ function restore() {
     if (o.monOpen != null) S.monOpen = !!o.monOpen;
     if (o.draw) DRAW = o.draw;
     if (o.collapsed != null) S.collapsed = !!o.collapsed;
+    S.toolsOff = (o.toolsOff != null) ? !!o.toolsOff : true;
     if (o.v !== 3) S.ind = { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: true, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true };
   } catch (e) {}
 }
@@ -1642,7 +1644,14 @@ document.querySelector("[data-yzout]").addEventListener("click", function () { S
 function syncCollapse() {
   document.body.classList.toggle("rows-off", S.collapsed);
   document.querySelector("[data-collapse]").textContent = S.collapsed ? "展开▼" : "收起▲";
+  // 画线/指标两长行收进"工具"钮,股票/周期常驻——顶栏不再一屏全是按钮
+  document.body.classList.toggle("tools-off", !!S.toolsOff);
+  var tb = document.querySelector("[data-tooltog]");
+  if (tb) tb.textContent = S.toolsOff ? "工具▾" : "工具▴";
 }
+document.querySelector("[data-tooltog]").addEventListener("click", function () {
+  S.toolsOff = !S.toolsOff; store(); syncCollapse();
+});
 document.querySelector("[data-collapse]").addEventListener("click", function () {
   S.collapsed = !S.collapsed; store(); syncCollapse();
 });
