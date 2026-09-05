@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-3 EMA默认关">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-4 LuxAlgo实时撑压带+强弱T变色">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -332,7 +332,7 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true },
+  ind: { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true, lsr: true },
   triScan: null,
   fflow: [], rtflow: [], floatMV: 0,
   lineMode: true, drawLock: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
@@ -351,7 +351,7 @@ function restore() {
     if (o.codes && o.codes.length) S.codes = o.codes;
     if (o.active) S.active = o.active;
     if (o.klt) S.klt = o.klt;
-    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.lr == null || S.ind.lr === true) S.ind.lr = "view"; if (S.ind.solid == null) S.ind.solid = false; if (S.ind.atri == null) S.ind.atri = true; if (S.ind.ddx == null) S.ind.ddx = false; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = false; if (S.ind.hma == null) S.ind.hma = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; if (S.ind.macd == null) S.ind.macd = true; if (S.ind.tqs == null) S.ind.tqs = true; if (S.ind.dsup == null) S.ind.dsup = true; if (S.ind.paneTop == null) S.ind.paneTop = false; if (S.ind.cost == null) S.ind.cost = true; }
+    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.lr == null || S.ind.lr === true) S.ind.lr = "view"; if (S.ind.solid == null) S.ind.solid = false; if (S.ind.atri == null) S.ind.atri = true; if (S.ind.ddx == null) S.ind.ddx = false; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = false; if (S.ind.hma == null) S.ind.hma = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; if (S.ind.macd == null) S.ind.macd = true; if (S.ind.tqs == null) S.ind.tqs = true; if (S.ind.dsup == null) S.ind.dsup = true; if (S.ind.lsr == null) S.ind.lsr = true; if (S.ind.paneTop == null) S.ind.paneTop = false; if (S.ind.cost == null) S.ind.cost = true; }
     if (o.lineMode != null) S.lineMode = !!o.lineMode;
     if (o.pdhlMode) S.pdhlMode = o.pdhlMode;
     if (o.drawLock) S.drawLock = true;
@@ -359,7 +359,7 @@ function restore() {
     if (o.draw) DRAW = o.draw;
     if (o.collapsed != null) S.collapsed = !!o.collapsed;
     S.toolsOff = (o.toolsOff != null) ? !!o.toolsOff : false; // 画图工具默认展开(用户高频使用画线)
-    if (o.v !== 3) S.ind = { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true };
+    if (o.v !== 3) S.ind = { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true, lsr: true };
   } catch (e) {}
 }
 function dkey() { return S.active + ":" + S.klt; }
@@ -867,6 +867,7 @@ function draw() {
   }
   // v2: 我的买卖点(今日做T记录) —— 绿▲买 红▼卖, 东财同款直观
   renderDynSupRes(ctx, v, kl, i0, i1);
+  renderLuxSR(ctx, v, kl, i0, i1);
   renderTradeMarks(ctx, v, kl, i0, i1);
   // BOLL(14, 2倍) 叠加
   if (S.ind.boll) {
@@ -2287,6 +2288,70 @@ function renderDynSupRes(ctx, v, kl, i0, i1) {
   });
 }
 
+/* ================= LuxAlgo 式实时撑压带 =================
+   w=5 摆动点锚定 -> 矩形带(带高=ATR14×0.25)从锚定K线拉到右缘, 每根新K重算=跟着实时价跑。
+   角色翻转: 收盘上破压带 -> 该带转绿(压力变支撑); 收盘下破撑带 -> 转红(支撑变压力)。
+   只取现价上方最近2条+下方最近2条, 不糊满屏。 */
+function renderLuxSR(ctx, v, kl, i0, i1) {
+  if (!S.ind.lsr || kl.length < 30) return;
+  var n = kl.length, w5 = 5, pivH = [], pivL = [];
+  for (var g = w5; g < n - w5; g++) {
+    var isH = true, isL = true;
+    for (var k2 = g - w5; k2 <= g + w5; k2++) {
+      if (kl[k2][2] > kl[g][2]) isH = false;
+      if (kl[k2][3] < kl[g][3]) isL = false;
+      if (!isH && !isL) break;
+    }
+    if (isH) pivH.push({ i: g, p: kl[g][2] });
+    if (isL) pivL.push({ i: g, p: kl[g][3] });
+  }
+  if (!pivH.length && !pivL.length) return;
+  var atr = 0;
+  for (var a = Math.max(1, n - 14); a < n; a++) {
+    atr += Math.max(kl[a][2] - kl[a][3], Math.abs(kl[a][2] - kl[a - 1][4]), Math.abs(kl[a][3] - kl[a - 1][4]));
+  }
+  atr /= 14;
+  var zh = atr * 0.25; // 半带高, 整带=0.5ATR(0.25太细看不清)
+  var lastC = kl[n - 1][4];
+  var right = v.padL + (v.i1 - v.i0) * v.step;
+  function stateOf(pv, isHigh) {
+    var orig = isHigh ? "res" : "sup", st = orig;
+    for (var b = pv.i + 1; b < n; b++) {
+      var c = kl[b][4];
+      if (st === "res" && c > pv.p) st = (orig === "res") ? "sup" : "dead"; // 压被上破→翻撑; 翻来的压被收复→失效
+      else if (st === "sup" && c < pv.p) st = (orig === "sup") ? "res" : "dead"; // 撑被下破→翻压; 翻来的撑失守→失效
+    }
+    return st;
+  }
+  function pick(pivs, isHigh) {
+    var out = [];
+    for (var j = pivs.length - 1; j >= 0 && out.length < 5; j--) {
+      var pv = pivs[j], st = stateOf({ i: pv.i, p: pv.p }, isHigh);
+      if (st === "dead") continue; // 翻转后又反向穿回=失效带, 不画
+      var dup = false;
+      for (var m = 0; m < out.length; m++) if (Math.abs(out[m].p / pv.p - 1) < 0.004) dup = true;
+      if (!dup) out.push({ i: pv.i, p: pv.p, sup: st === "sup" });
+    }
+    out.sort(function (x, y2) { return Math.abs(x.p - lastC) - Math.abs(y2.p - lastC); });
+    return out.slice(0, 2);
+  }
+  var zones = pick(pivH, true).concat(pick(pivL, false));
+  ctx.font = "8px Menlo, monospace"; ctx.textBaseline = "alphabetic";
+  zones.forEach(function (z) {
+    var yT = v.Y(z.p + zh), yB = v.Y(z.p - zh);
+    if (yB < v.pTop || yT > v.pTop + v.priceH) return;
+    var x0 = Math.max(v.padL, z.i >= i0 ? v.X(z.i) : v.padL);
+    var col = z.sup ? "53,217,154" : "255,111,102";
+    ctx.fillStyle = "rgba(" + col + ",0.11)";
+    ctx.fillRect(x0, yT, right - x0, yB - yT);
+    ctx.strokeStyle = "rgba(" + col + ",0.5)"; ctx.lineWidth = 0.8;
+    ctx.strokeRect(x0, yT, right - x0, yB - yT);
+    ctx.beginPath(); ctx.moveTo(x0, v.Y(z.p)); ctx.lineTo(right, v.Y(z.p)); ctx.stroke();
+    ctx.fillStyle = z.sup ? "#4fd79b" : "#ff8a80"; ctx.textAlign = "right";
+    ctx.fillText((z.sup ? "撑" : "压") + " " + fwp(z.p), right - 3, yT - 2);
+  });
+}
+
 /* ================= 强弱T面板（v2 区间位置版） =================
    pos=(收盘-近N根最低)/(近N根最高-最低)*100 —— 价格本身就是标尺: 创区间新高=100贴红线,
    创区间新低=0贴绿线, 与主图高低点严格一一对应, 没有均线滞后。
@@ -2325,10 +2390,12 @@ function renderTqs(ctx, v) {
   ctx.setLineDash([]);
   ctx.strokeStyle = "rgba(150,180,166,0.3)"; ctx.beginPath(); ctx.moveTo(v.padL, PY(50)); ctx.lineTo(right, PY(50)); ctx.stroke();
   // 位置折线(金) + 出界点染色(红=贴上轨高位 / 绿=贴下轨低位)
-  ctx.strokeStyle = "#e6b43c"; ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  for (var i = v.i0; i < v.i1; i++) { var px = v.X(i), py = PY(P2[i]); if (i === v.i0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
-  ctx.stroke();
+  ctx.lineWidth = 1.3;
+  for (var i = Math.max(v.i0, 1); i < v.i1; i++) { // 分段染色: 高位段红/低位段绿/中间金, 一眼看出在哪区
+    var sA = P2[i - 1], sB = P2[i], sM = (sA + sB) / 2;
+    ctx.strokeStyle = sM >= 80 ? "#ff6f66" : (sM <= 20 ? "#35d99a" : "#e6b43c");
+    ctx.beginPath(); ctx.moveTo(v.X(i - 1), PY(sA)); ctx.lineTo(v.X(i), PY(sB)); ctx.stroke();
+  }
   for (i = Math.max(v.i0, 1); i < v.i1; i++) {
     var p0 = P2[i];
     if (p0 >= 80 || p0 <= 20) {
@@ -2625,7 +2692,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"], ["paneTop", "副图上置"]];
+var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"], ["paneTop", "副图上置"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
