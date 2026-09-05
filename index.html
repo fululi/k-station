@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-4 LuxAlgo实时撑压带+强弱T变色">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-5 买卖配对涨幅箭头+embed票头隐藏+删杂字">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -101,10 +101,11 @@
     pointer-events: none; text-align: right; line-height: 1.5;
   }
   .lnkb { font-size: 10px; color: #8fa398; white-space: nowrap; }
+  body.embed [data-name], body.embed [data-px], body.embed [data-pct], body.embed [data-lnk] { display: none; }
 </style>
 </head>
 <body data-page-node-id="HNiVlflFjLy4h9C7kZni9s">
-<div class="topbar" data-page-node-id="rkFiWqJwDe8rCQLnZupxAU">
+<div class="topbar" data-page-node-id="rkFiWqJwDe8rCQLnZupxAU" data-topbar>
   <span class="name" data-name data-page-node-id="HSvpyYau4ZaBRgMZBt1eLp">—</span>
   <span class="px flat" data-px data-page-node-id="txGVgZWnVDfB29d7SjbIgW">—</span>
   <span class="pct flat" data-pct data-page-node-id="bGogsEvjsNWtx4EKqbX6Rp">—</span>
@@ -1280,7 +1281,7 @@ cv.addEventListener("touchstart", function (e) {
   }
   if (S.tool && !S.drawLock) { placeAnchor(pt); T = { mode: "draw" }; return; }
   // 右侧价格轴：上下拖动 = 纵向缩放（不影响画图和平移）
-  if (pt.x > cv.clientWidth - 64) { T = { mode: "yzoom", ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
+  if (pt.x > cv.clientWidth - 64) { T = { mode: "yzoom", ly: pt.y, z0: S.yZoom }; hint(""); return; }
   var hit0 = hitTest(pt);
   if (hit0 >= 0) {
     S.selected = hit0;
@@ -1415,7 +1416,7 @@ cv.addEventListener("mousedown", function (e) {
     return;
   }
   if (S.tool && !S.drawLock) { placeAnchor(pt); return; }
-  if (pt.x > cv.clientWidth - 64) { M = { yzoom: true, ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
+  if (pt.x > cv.clientWidth - 64) { M = { yzoom: true, ly: pt.y, z0: S.yZoom }; hint(""); return; }
   var hit0 = hitTest(pt);
   if (hit0 >= 0) {
     S.selected = hit0;
@@ -1518,7 +1519,7 @@ cv.addEventListener("wheel", function (e) {
 }, { passive: false });
 cv.addEventListener("dblclick", function (e) {
   var pt = posT(e);
-  if (pt.x > cv.clientWidth - 64) { S.yZoom = 1; S.yOff = 0; hint("价格轴缩放/位移已复位"); draw(); return; }
+  if (pt.x > cv.clientWidth - 64) { S.yZoom = 1; S.yOff = 0; hint(""); draw(); return; }
   togglePane(paneAt(view(), pt.y));
 });
 cv.addEventListener("mouseleave", function () {
@@ -2209,6 +2210,7 @@ function renderTradeMarks(ctx, v, kl, i0, i1) {
   if (!S.urlTrades || !S.urlTrades.length) return;
   var tol = (S.klt === "101" || S.klt === "102" || S.klt === "103") ? 0 : Math.max(1, parseInt(S.klt, 10) || 1);
   function mins(ts) { var hm2 = ts.slice(11, 16).split(":"); return (+hm2[0]) * 60 + (+hm2[1]); }
+  var mk = []; // 定位后的点, 供配对画箭头
   S.urlTrades.forEach(function (tr) {
     var D = tr.dt.slice(0, 10), hasT = tr.dt.length > 10;
     var bi = -1, bd = 1e9;
@@ -2231,6 +2233,32 @@ function renderTradeMarks(ctx, v, kl, i0, i1) {
     ctx.closePath(); ctx.fill();
     ctx.font = "bold 10px Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.fillText((buy ? "B " : "S ") + tr.p, x, buy ? yy + 30 : yy - 22);
+    mk.push({ x: x, y: yy, p: tr.p, side: tr.side, dt: tr.dt });
+  });
+  // 配对涨幅箭头: 按时间相邻的买→卖(正T)/卖→买(反T)连线, 标这一轮的涨幅
+  mk.sort(function (a, b) { return a.dt < b.dt ? -1 : 1; });
+  var pend = null;
+  mk.forEach(function (m2) {
+    if (!pend) { pend = m2; return; }
+    if (pend.side === m2.side) { pend = m2; return; } // 同向连买/连卖, 以最新为准
+    var bP = pend.side === "b" ? pend.p : m2.p, sP = pend.side === "b" ? m2.p : pend.p;
+    var pc = (sP / bP - 1) * 100;
+    var win = pc >= 0;
+    ctx.strokeStyle = win ? "rgba(255,111,102,0.85)" : "rgba(53,217,154,0.85)";
+    ctx.fillStyle = win ? "#ff6f66" : "#35d99a";
+    ctx.lineWidth = 1.2; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pend.x, pend.y); ctx.lineTo(m2.x, m2.y); ctx.stroke(); ctx.setLineDash([]);
+    // 箭头头部(小三角, 指向后一笔)
+    var dx = m2.x - pend.x, dy = m2.y - pend.y, L = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ux = dx / L, uy = dy / L, px2 = -uy, py2 = ux;
+    ctx.beginPath();
+    ctx.moveTo(m2.x, m2.y);
+    ctx.lineTo(m2.x - ux * 9 + px2 * 4, m2.y - uy * 9 + py2 * 4);
+    ctx.lineTo(m2.x - ux * 9 - px2 * 4, m2.y - uy * 9 - py2 * 4);
+    ctx.closePath(); ctx.fill();
+    ctx.font = "bold 10px Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText((win ? "+" : "") + pc.toFixed(1) + "%", (pend.x + m2.x) / 2, (pend.y + m2.y) / 2 - 5);
+    pend = null;
   });
 }
 // 时间平移按钮: 一下翻1/4屏, 比拖拽省事
@@ -2414,7 +2442,6 @@ function renderTqs(ctx, v) {
   // 标题 + 末端位置读数
   var lastP = Math.round(P2[n0 - 1]);
   ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-  ctx.fillText("强弱T · 近" + N + "根区间 · ★=刚进高/低位区(带价位) · 点我放大", v.padL + 4, y + 9);
   ctx.fillStyle = lastP >= 80 ? "#ff6f66" : (lastP <= 20 ? "#35d99a" : "#d9b45c");
   ctx.font = "bold 10px Menlo, monospace"; ctx.textAlign = "right";
   ctx.fillText(String(lastP), right - 2, y + 9);
@@ -2746,6 +2773,7 @@ function buildInds() {
 function applyUrl() {
   try {
     var q = new URLSearchParams(location.search);
+    if (q.get("embed") === "1") document.body.classList.add("embed"); // hq内嵌: 隐藏票头, hq卡片已有同名同价
     var code = q.get("code");
     if (code) {
       code = code.trim();
@@ -2800,7 +2828,8 @@ function applyUrl() {
 }
 restore();
 try { if (!localStorage.getItem("ks_rtfoff_v1")) { S.ind.rtflow = false; localStorage.setItem("ks_rtfoff_v1", "1"); } } catch (e) {}
-try { if (!localStorage.getItem("ks_maoff_v1")) { S.ind.ma = false; localStorage.setItem("ks_maoff_v1", "1"); } } catch (e) {} // 用户指定: 打开默认不显示EMA(指标行可手动开回)
+try { if (!localStorage.getItem("ks_maoff_v1")) { S.ind.ma = false; localStorage.setItem("ks_maoff_v1", "1"); } } catch (e) {}
+try { if (!localStorage.getItem("ks_fvgoff_v1")) { S.ind.fvg = false; S.ind.liq = false; S.ind.ob = false; localStorage.setItem("ks_fvgoff_v1", "1"); } } catch (e) {} // FVG/流动性/订单块与实时撑压带视觉重复, 默认关, 要用指标行点回 // 用户指定: 打开默认不显示EMA(指标行可手动开回)
 applyUrl();
 try { if (!S.simple && !localStorage.getItem("ks_toolsoff_v1")) { S.toolsOff = true; localStorage.setItem("ks_toolsoff_v1", "1"); store(); } } catch (e) {} // 画线/指标两行默认收进"工具▾"(点一下展开),股票/周期常驻——顶栏从四排瘦成两排
 buildTabs(); buildPeriods(); buildTools(); buildInds(); syncCollapse();
