@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-8 B1→S1测幅箭头+档位线默认锁+simple浮动锁钮+EMA/HMA默认关">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-9 信号文案按回测结论分级: 触撑改观察/小周期破轨去强指令">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -2057,6 +2057,7 @@ function renderAutoTri(ctx, v) {
   var iEnd = (v.i1 - 1) + futBars;
   var xEnd = v.padL + (iEnd - v.i0 + 0.5) * v.step;
   var last2 = n - 1, pc2 = kl[last2][4];
+  var bigK = ["15", "30", "60", "101", "102", "103"].indexOf(String(S.klt)) >= 0; // ks-0906-9: 回测结论——小周期(1/5分)信号噪音大, 强指令文案只在15分以上周期给
   var s60b = Math.max(0, n - 60), hi60 = -1e18, lo60 = 1e18;
   for (var g5 = s60b; g5 < n; g5++) { if (kl[g5][2] > hi60) hi60 = kl[g5][2]; if (kl[g5][3] < lo60) lo60 = kl[g5][3]; }
   var R60 = hi60 - lo60 || 1;
@@ -2090,7 +2091,7 @@ function renderAutoTri(ctx, v) {
       if (bAt >= 0) {
         ctx.font = "bold 10.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
         ctx.fillStyle = isHigh ? "#ff8a80" : "#4fd79b";
-        ctx.fillText(isHigh ? "▲破压轨·强势" : "▼破撑轨·走人", v.X(bAt) + 3, v.Y(bmm * bAt + bbb) + (isHigh ? -9 : 10));
+        ctx.fillText(isHigh ? (bigK ? "▲破压轨·强势" : "▲破压轨") : (bigK ? "▼破撑轨·走人" : "▼破撑轨"), v.X(bAt) + 3, v.Y(bmm * bAt + bbb) + (isHigh ? -9 : 10));
       }
       a2 = b2 = -1; // 主线交给下方水平防线
     } else if (chosen) { a2 = chosen[0]; b2 = chosen[1]; }
@@ -2129,20 +2130,20 @@ function renderAutoTri(ctx, v) {
     if (yE > v.pTop + 6 && yE < v.pTop + v.priceH - 6) {
       ctx.fillStyle = col; ctx.fillText((isHigh ? "压轨 " : "撑轨 ") + pe.toFixed(dec()), right2 + 2, yE);
     }
-    // 触轨提醒: 现价贴轨0.3%内 → 压轨S/撑轨B
+    // 触轨提醒: 现价贴轨0.3%内 → ks-0906-9回测证伪"触撑即买"(全周期胜率36-48%均值负), 撑轨只给中性观察, 压轨保留S(触压回调仍偏有效)
     if (pc2 != null && pv > 0 && Math.abs(pc2 / pv - 1) < 0.003) {
       ctx.font = "bold 10px -apple-system, sans-serif"; ctx.textAlign = "right";
-      ctx.fillStyle = isHigh ? "#ff8a80" : "#4fd79b";
-      ctx.fillText(isHigh ? "触压轨·S" : "触撑轨·B", right2 - 4, v.Y(pv) + (isHigh ? -8 : 11));
+      ctx.fillStyle = isHigh ? "#ff8a80" : "rgba(141,163,152,0.9)";
+      ctx.fillText(isHigh ? "触压轨·S" : "触撑·观察", right2 - 4, v.Y(pv) + (isHigh ? -8 : 11));
     }
-    // 破轨提醒: 最近3根收盘穿越轨道 → 破压↑(强势,别瞎卖)/破撑↓(破位,先跑)
+    // 破轨提醒: 最近3根收盘穿越轨道 → ks-0906-9回测分级: 15分及以上给强指令(破压强势80%涨/破撑83%续跌), 1/5分噪音大只标中性破位
     for (var jb = Math.max(b2 + 1, n - 3); jb < n; jb++) {
       var cPrev = kl[jb - 1][4], cNow = kl[jb][4], lPrev = mm * (jb - 1) + bb2, lNow = mm * jb + bb2;
       var cross = isHigh ? (cPrev <= lPrev && cNow > lNow) : (cPrev >= lPrev && cNow < lNow);
       if (cross) {
         ctx.font = "bold 10.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
         ctx.fillStyle = isHigh ? "#ff8a80" : "#4fd79b";
-        ctx.fillText(isHigh ? "▲破压轨·强势" : "▼破撑轨·走人", v.X(jb) + 3, v.Y(lNow) + (isHigh ? -9 : 10));
+        ctx.fillText(isHigh ? (bigK ? "▲破压轨·强势" : "▲破压轨") : (bigK ? "▼破撑轨·走人" : "▼破撑轨"), v.X(jb) + 3, v.Y(lNow) + (isHigh ? -9 : 10));
         break;
       }
     }
