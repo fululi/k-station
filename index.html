@@ -55,9 +55,13 @@
   .row.seps .btn { padding: 4px 8px; font-size: 11.5px; min-height: 24px; }
   /* 周期行 TradingView 式紧凑横滚: 小钮密排单行, 左右滑看全部周期/范围, 少占一截屏 */
   [data-periods] { gap: 3px; padding: 3px 8px 1px; }
+  #pper { position: fixed; z-index: 70; background: #141b16; border: 1px solid #2c3a31; border-radius: 8px; padding: 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.55); }
+  #pper button { background: #1b241e; color: #c3d2c6; border: 1px solid #2c3a31; border-radius: 6px; padding: 6px 10px; font-size: 11.5px; }
+  #pper button.on { border-color: #d9b45c; color: #d9b45c; }
   [data-periods] .btn { padding: 2px 7px; font-size: 10.5px; min-height: 20px; border-radius: 4px; }
-  .tpan { position: absolute; right: 62px; bottom: 24px; display: flex; gap: 6px; z-index: 6; }
-  .tpan button { background: rgba(18,24,20,.85); color: #9fb3a6; border: 1px solid #2c3a31; border-radius: 7px; padding: 5px 11px; font-size: 12px; }
+  .tpan { position: absolute; right: 60px; bottom: 20px; display: flex; gap: 4px; z-index: 6; opacity: .55; }
+  .tpan button { background: rgba(18,24,20,.7); color: #9fb3a6; border: 1px solid #2c3a31; border-radius: 11px; padding: 2px 10px; font-size: 11px; }
+  .tpan button:active { opacity: 1; }
   .rsep { flex: none; width: 1px; background: #30433a; margin: 2px 3px; align-self: stretch; }
   .btn.rgb { color: #8fb3a2; }
   .topbar .fresh { font-size: 10px; color: #5d6f64; flex: none; font-variant-numeric: tabular-nums; }
@@ -80,8 +84,8 @@
   }
   #chartwrap { flex: 1; position: relative; min-height: 0; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-  .yz { position: absolute; right: 62px; top: 16%; display: flex; flex-direction: column; gap: 6px; z-index: 5; opacity: .55; }
-  .yz button { width: 26px; height: 26px; border-radius: 13px; background: rgba(16,22,18,0.6); color: #d9b45c; border: 1px solid #3a4a40; font-size: 10px; font-weight: 700; padding: 0; }
+  .yz { position: absolute; right: 60px; top: 12%; display: flex; flex-direction: row; gap: 4px; z-index: 5; opacity: .45; }
+  .yz button { width: 22px; height: 22px; border-radius: 11px; background: rgba(16,22,18,0.6); color: #d9b45c; border: 1px solid #3a4a40; font-size: 11px; font-weight: 700; padding: 0; }
   .yz button:active { opacity: 1; }
   .hint {
     flex: none; font-size: 11.5px; color: #d9b45c; padding: 5px 10px;
@@ -115,20 +119,8 @@
 <div id="chartwrap" data-page-node-id="zqeTR6rE0rPiTUS2gHFn6g">
   <canvas data-chart data-page-node-id="tBlmlXBNXGyUBQ38W5sm3J"></canvas>
   <div class="yz" data-page-node-id="M5km2Nilu3r9diHBiEP7O8"><button type="button" data-yzin title="纵向放大" data-page-node-id="IwXBboDm2CiFJvVpgkdwLQ">＋</button><button type="button" data-yzout title="纵向缩小" data-page-node-id="P1nk2xa8jeHhDX5pW0pAQD">－</button></div>
-<div class="tpan" data-page-node-id="dKei7X02s66kfDU8hLChRw"><button type="button" onclick="panTime(-1)" data-page-node-id="soce9cG5d6g4qGXYe79Hch">◀ 早前</button><button type="button" onclick="panTime(1)" data-page-node-id="rSyCfM0fi4YypF3jRIhJaA">往后 ▶</button></div>
+<div class="tpan" data-page-node-id="dKei7X02s66kfDU8hLChRw"><button type="button" onclick="panTime(-1)" title="早前" data-page-node-id="soce9cG5d6g4qGXYe79Hch">◀</button><button type="button" onclick="panTime(1)" title="往后" data-page-node-id="rSyCfM0fi4YypF3jRIhJaA">▶</button></div>
 </div>
-<details id="icthelp" data-page-node-id="3MnNEYd50xFmB54CZEwgb9">
-  <summary data-page-node-id="qWvCzvCxGHGOcKZ4fv0xMT">📖 图上标注都是啥意思（点我展开）</summary>
-  <div class="icthelp-body" data-page-node-id="JRoR8UKykRGM3Jqe0KZ2N1">
-    <b class="down" data-page-node-id="HK7oXD9sl5hvDPtrR6w0Bv">FVG支撑</b> / <b class="up" data-page-node-id="NAxpq94AHBm5mRIm10EmuT">FVG压力</b>：三根蜡烛的跳空缺口，价格倾向回补；"·半补"=已补一半，剩一半悬着，缺口上下沿就是支撑/压力<br data-page-node-id="HiyF2aeUmSWRTiX59S3VqC">
-    <b style="color:#ffab2e" data-page-node-id="kCeUhesmDzYcMQjMrTSR24">Buy Side Liquidity 橙带</b>：前高点上方的<b data-page-node-id="HqdKkQmHIywRqkOPVBlfyk">空头止损密集区</b>。主力要出货需要买盘接盘，把价格拉上来逼空头止损（空头一止损就是买单）——主力借这波买单出货。所以它是"拉高出货目标位"，扫到这里别追，手里有货反而可以减<br data-page-node-id="Ea7nKa2Ibrg65GM6bCYRJd">
-    <b style="color:#2ef2d0" data-page-node-id="BFDkc8prm7t07uKQLssMCz">Sell Side Liquidity 青带</b>：前低点下方的<b data-page-node-id="1qCLyEAeLbgboALArRNqOg">多头止损密集区</b>。主力要进货需要卖盘，故意砸下来逼多头止损（多头一止损就是卖单）——主力借这波卖单吸筹，这就是"洗盘"，故意让你把筹码交出来。砸到这里别慌着割<br data-page-node-id="BuXHncZ1FXWywIXmNPVnlQ">
-    <b style="color:#ffd21f" data-page-node-id="qBfd6ud9afgWhy8KMUWi6L">OB·进货区</b>（黄块）：一波拉升前的最后一根阴线，主力建仓成本区 = <b data-page-node-id="H9TpiHHr81uhCuQtozbYtj">持仓/加仓参考区</b>，回踩到这里看支撑<br data-page-node-id="tvkkDfbn7f4b7Jf8OthSZS">
-    <b style="color:#ff8a80" data-page-node-id="nyENXqfyQiLxhhIfBTGnsN">OB·出货区</b>（浅红块）：一波下跌前的最后一根阳线，主力派发区 = <b data-page-node-id="IZgYHHGQIohhv593bM9KZb">压力位</b>，反弹到这里看压力<br data-page-node-id="J6K4Rb05cznHR2No8beABY">
-    <b class="flat" data-page-node-id="ZZEj3IoVkqMGVd70OShr0K">BOS↗/↘</b>：收盘顺势突破前高/前低 = 趋势延续，顺势单的加仓参考<br data-page-node-id="hVfduSkcliXigzZw4jtkFX">
-    <b style="color:#ff6fd8" data-page-node-id="7FS3JqPIjdtMpL5B32be71">CHoCH⚠</b>：收盘逆势跌破/突破结构 = 趋势可能反转的<b data-page-node-id="oqgmPN0ne9QgFFHVYREb19">预警</b>（不是确认），出现它要收紧止损
-  </div>
-</details>
 <div class="hint" data-hint data-page-node-id="IPLikWe2HHiI6TJW4eVqwD">加载中…</div>
 <script>
 "use strict";
@@ -507,6 +499,17 @@ function triScanAll() {
     });
   }, 600);
 }
+/* ---- 副图顶部标签条(左半区)轻点=放大/缩小 ---- */
+function paneLabelAt(v, x, y) {
+  if (!v) return null;
+  function inLbl(py, ph) { return ph && y >= py && y <= py + Math.min(15, ph) && x <= v.padL + 210; }
+  if (inLbl(v.volY, v.volH)) return "vol";
+  if (v.macdH && inLbl(v.macdY, v.macdH)) return "macd";
+  if (v.rtH && inLbl(v.rtY, v.rtH)) return "rt";
+  if (v.zlyyH && inLbl(v.zlyyY, v.zlyyH)) return "zlyy";
+  if (v.tqsH && inLbl(v.tqsY, v.tqsH)) return "tqs";
+  return null;
+}
 /* ---- 副图双击放大：判断点击落在哪个副图 ---- */
 function paneAt(v, y) {
   if (!v) return null;
@@ -520,7 +523,7 @@ function paneAt(v, y) {
 function togglePane(p2) {
   if (!p2) return false;
   S.bigPane = S.bigPane === p2 ? null : p2;
-  hint(S.bigPane ? "副图已放大 · 再双击该图恢复" : "副图已恢复");
+  hint(S.bigPane ? "副图已放大 · 再点该图标题条恢复" : "副图已恢复");
   draw();
   return true;
 }
@@ -549,11 +552,15 @@ function ptsOf(v, im, pts) {
 function drawSeg(ctx, a, b) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
 function renderOneDrawing(ctx, v, im, dg, sel) {
   var pts = ptsOf(v, im, dg.pts);
+  if (!pts && (dg.type === "hline" || dg.type === "buy") && dg.pts && dg.pts.length) {
+    // 价格线认"价位"不认"日期": 切周期(日↔分钟)后原锚点日期不在新数据里,线照样画
+    pts = [{ x: v.padL + (v.i1 - v.i0) * v.step, y: v.Y(dg.pts[0].p), i: v.i1 - 1 }];
+  }
   if (!pts) return;
   var right = v.padL + (v.i1 - v.i0) * v.step;
   ctx.strokeStyle = sel ? SEL : "#e6b43c";
   ctx.fillStyle = sel ? SEL : "#e6b43c";
-  ctx.lineWidth = sel ? 2.4 : 1.6;
+  ctx.lineWidth = sel ? 1.8 : 1.1;
   ctx.setLineDash(dg.dash ? [7, 5] : []);
   ctx.font = "10px -apple-system, sans-serif";
   ctx.textAlign = "left"; ctx.textBaseline = "middle";
@@ -604,8 +611,8 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
   else if (t === "hline" || t === "buy") {
     var tag0 = dg.tag || "";
     var lc = tag0.charAt(0) === "B" ? "#35d99a" : (tag0.charAt(0) === "S" ? "#ff6f66" : (tag0.indexOf("低吸") === 0 ? "#35d99a" : (tag0.indexOf("高抛") === 0 ? "#ff6f66" : "#e6b43c")));
-    if (t === "buy") { ctx.strokeStyle = sel ? SEL : "#ffd21f"; ctx.lineWidth = sel ? 2.4 : 1.8; }
-    else if (tag0) { ctx.strokeStyle = sel ? SEL : lc; ctx.lineWidth = sel ? 2.4 : 1.8; }
+    if (t === "buy") { ctx.strokeStyle = sel ? SEL : "#ffd21f"; ctx.lineWidth = sel ? 1.6 : 1; }
+    else if (tag0) { ctx.strokeStyle = sel ? SEL : lc; ctx.lineWidth = sel ? 1.6 : 1; }
     ctx.beginPath(); ctx.moveTo(v.padL, pts[0].y); ctx.lineTo(right, pts[0].y); ctx.stroke();
     // 标签放左缘深色胶囊(右缘留给昨/今高低), 加粗放大, 不再被裁切
     var lab = (dg.tag ? dg.tag + " " : (t === "buy" ? "买 " : "")) + fwp(dg.pts[0].p);
@@ -1267,6 +1274,8 @@ cv.addEventListener("touchend", function (e) {
     if (S.monRect && T.x0 >= S.monRect.x && T.x0 <= S.monRect.x + S.monRect.w && T.y0 >= S.monRect.y && T.y0 <= S.monRect.y + S.monRect.h) {
       S.monOpen = !S.monOpen; store(); draw(); T = null; return;
     }
+    var pl9 = paneLabelAt(view(), T.x0, T.y0);
+    if (pl9) { togglePane(pl9); T = null; return; }
     var now2 = Date.now();
     var lt = S.lastTap;
     S.lastTap = { t: now2, x: T.x0, y: T.y0 };
@@ -1488,6 +1497,35 @@ function rangesFor(klt) {
   var m = +klt || 5, d = Math.max(16, Math.round(240 / m));
   return [["半日", Math.max(15, Math.round(d / 2))], ["1日", d], ["3日", d * 3], ["全", 0]];
 }
+function setKlt(k) {
+  if (S.klt === k) return;
+  S.klt = k; S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.yZoom = 1; S.yOff = 0;
+  store(); buildPeriods(); loadAll(true);
+}
+function stepPeriod(d) {
+  var i = 0;
+  for (var k = 0; k < PERIODS.length; k++) if (PERIODS[k][0] === S.klt) { i = k; break; }
+  i = (i + d + PERIODS.length) % PERIODS.length;
+  setKlt(PERIODS[i][0]);
+}
+function curPeriodName() { for (var k = 0; k < PERIODS.length; k++) if (PERIODS[k][0] === S.klt) return PERIODS[k][1]; return S.klt; }
+function togglePPicker(anchor) { // 点档位名弹出全周期直选(滚筒太慢时一键直达)
+  var old = document.getElementById("pper");
+  if (old) { old.remove(); return; }
+  var box = document.createElement("div"); box.id = "pper";
+  PERIODS.forEach(function (p) {
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = p[1];
+    if (p[0] === S.klt) b.className = "on";
+    b.addEventListener("click", function (e) { e.stopPropagation(); box.remove(); setKlt(p[0]); });
+    box.appendChild(b);
+  });
+  document.body.appendChild(box);
+  var r = anchor.getBoundingClientRect();
+  box.style.left = Math.max(6, Math.min(r.left, window.innerWidth - 160)) + "px";
+  box.style.top = (r.bottom + 4) + "px";
+  setTimeout(function () { document.addEventListener("click", function h() { box.remove(); document.removeEventListener("click", h); }); }, 0);
+}
 function buildPeriods() {
   var el = document.querySelector("[data-periods]");
   el.innerHTML = "";
@@ -1501,17 +1539,14 @@ function buildPeriods() {
     hint(S.lineMode ? "收盘价线图模式 · 再点切回K线蜡烛" : "K线蜡烛模式");
   });
   el.appendChild(lb);
-  PERIODS.forEach(function (p) {
-    var b = document.createElement("button");
-    b.className = "btn tabbtn" + (p[0] === S.klt ? " on" : "");
-    b.type = "button"; b.textContent = p[1];
-    b.addEventListener("click", function () {
-      if (S.klt === p[0]) return;
-      S.klt = p[0]; S.kl = []; S.end = 0; S.count = 0; S.pending = []; S.selected = -1; S.yZoom = 1; S.yOff = 0;
-      store(); buildPeriods(); loadAll(true);
-    });
-    el.appendChild(b);
-  });
+  // 滚筒式周期切换: ◀ ▶ 逐档滚, 点中间档位名弹出全周期直选——不再一整行按钮占屏
+  var pb = document.createElement("button"); pb.className = "btn tabbtn"; pb.type = "button"; pb.textContent = "◀";
+  pb.addEventListener("click", function () { stepPeriod(-1); });
+  var pc2 = document.createElement("button"); pc2.className = "btn tabbtn on"; pc2.type = "button"; pc2.textContent = curPeriodName() + " ▾";
+  pc2.addEventListener("click", function () { togglePPicker(pc2); });
+  var pf = document.createElement("button"); pf.className = "btn tabbtn"; pf.type = "button"; pf.textContent = "▶";
+  pf.addEventListener("click", function () { stepPeriod(1); });
+  el.appendChild(pb); el.appendChild(pc2); el.appendChild(pf);
   var sep = document.createElement("span"); sep.className = "rsep"; el.appendChild(sep);
   rangesFor(S.klt).forEach(function (r) {
     var rb = document.createElement("button");
@@ -2194,7 +2229,7 @@ function renderTqs(ctx, v) {
   // 标题 + 末端位置读数
   var lastP = Math.round(P2[n0 - 1]);
   ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-  ctx.fillText("强弱T · 近" + N + "根区间位置 · 贴红线=高位 贴绿线=低位 · 双击放大", v.padL + 4, y + 9);
+  ctx.fillText("强弱T · 近" + N + "根区间位置 · 贴红线=高位 贴绿线=低位 · 点我放大", v.padL + 4, y + 9);
   ctx.fillStyle = lastP >= 80 ? "#ff6f66" : (lastP <= 20 ? "#35d99a" : "#d9b45c");
   ctx.font = "bold 10px Menlo, monospace"; ctx.textAlign = "right";
   ctx.fillText(String(lastP), right - 2, y + 9);
