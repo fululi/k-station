@@ -329,7 +329,7 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: true, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true },
+  ind: { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true },
   triScan: null,
   fflow: [], rtflow: [], floatMV: 0,
   lineMode: true, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
@@ -348,14 +348,14 @@ function restore() {
     if (o.codes && o.codes.length) S.codes = o.codes;
     if (o.active) S.active = o.active;
     if (o.klt) S.klt = o.klt;
-    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.lr == null || S.ind.lr === true) S.ind.lr = "view"; if (S.ind.solid == null) S.ind.solid = false; if (S.ind.atri == null) S.ind.atri = true; if (S.ind.ddx == null) S.ind.ddx = false; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; if (S.ind.macd == null) S.ind.macd = true; if (S.ind.tqs == null) S.ind.tqs = true; if (S.ind.dsup == null) S.ind.dsup = true; if (S.ind.paneTop == null) S.ind.paneTop = false; if (S.ind.cost == null) S.ind.cost = true; }
+    if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.lr == null || S.ind.lr === true) S.ind.lr = "view"; if (S.ind.solid == null) S.ind.solid = false; if (S.ind.atri == null) S.ind.atri = true; if (S.ind.ddx == null) S.ind.ddx = false; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = false; if (S.ind.hma == null) S.ind.hma = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; if (S.ind.macd == null) S.ind.macd = true; if (S.ind.tqs == null) S.ind.tqs = true; if (S.ind.dsup == null) S.ind.dsup = true; if (S.ind.paneTop == null) S.ind.paneTop = false; if (S.ind.cost == null) S.ind.cost = true; }
     if (o.lineMode != null) S.lineMode = !!o.lineMode;
     if (o.pdhlMode) S.pdhlMode = o.pdhlMode;
     if (o.monOpen != null) S.monOpen = !!o.monOpen;
     if (o.draw) DRAW = o.draw;
     if (o.collapsed != null) S.collapsed = !!o.collapsed;
     S.toolsOff = (o.toolsOff != null) ? !!o.toolsOff : false; // 画图工具默认展开(用户高频使用画线)
-    if (o.v !== 3) S.ind = { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: true, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true };
+    if (o.v !== 3) S.ind = { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true };
   } catch (e) {}
 }
 function dkey() { return S.active + ":" + S.klt; }
@@ -367,7 +367,7 @@ function hint(t) { hintEl.innerHTML = t || ""; }
 function cls(p) { return p == null || isNaN(p) ? "flat" : (p > 0 ? "up" : (p < 0 ? "down" : "flat")); }
 function dec() { var t = typeOf(S.active); return (t === "ETF" || t === "FJ" || S.active === "515880") ? 3 : 2; }
 function fwp(v) { var d2 = dec(); return v == null || isNaN(v) ? "—" : v.toFixed(d2); }
-var UP = "#ff6f66", DN = "#35d99a", DIM = "#5d6f64", GRID = "rgba(38,51,44,0.6)", SEL = "#ffd21f";
+var UP = "#ff6f66", DN = "#35d99a", DIM = "#5d6f64", GRID = "rgba(38,51,44,0.32)", SEL = "#ffd21f";
 function maArr(kl, n) {
   var out = new Array(kl.length).fill(null), s = 0;
   for (var i = 0; i < kl.length; i++) {
@@ -397,6 +397,27 @@ function bollArr(kl, n, k) {
     mid[i] = m; up[i] = m + k * sd; dn[i] = m - k * sd;
   }
   return { mid: mid, up: up, dn: dn };
+}
+function wmaArr(kl, n) {
+  var out = new Array(kl.length).fill(null), den = n * (n + 1) / 2;
+  for (var i = n - 1; i < kl.length; i++) {
+    var s2 = 0;
+    for (var j = 0; j < n; j++) s2 += kl[i - j][4] * (n - j);
+    out[i] = s2 / den;
+  }
+  return out;
+}
+function hullArr(kl, n) { // Hull MA: WMA(2*WMA(n/2)-WMA(n), sqrt(n)), 比EMA快且平滑, 转向即变色
+  var h2 = Math.max(1, Math.round(n / 2)), sq = Math.max(1, Math.round(Math.sqrt(n)));
+  var w1 = wmaArr(kl, h2), w2 = wmaArr(kl, n);
+  var raw = kl.map(function (_, i) { return (w1[i] != null && w2[i] != null) ? 2 * w1[i] - w2[i] : null; });
+  var out = new Array(kl.length).fill(null), den = sq * (sq + 1) / 2;
+  for (var i = sq - 1; i < kl.length; i++) {
+    var s2 = 0, ok = true;
+    for (var j = 0; j < sq; j++) { var rv = raw[i - j]; if (rv == null) { ok = false; break; } s2 += rv * (sq - j); }
+    if (ok) out[i] = s2 / den;
+  }
+  return out;
 }
 function macdArr(kl) {
   var e12 = 0, e26 = 0, dea = 0, init = false;
@@ -911,6 +932,22 @@ function draw() {
       ctx.fillText(t, lx, v.pTop + 7);
       lx += ctx.measureText(t).width + 8;
     });
+  }
+  // 变色均线 Hull MA(21): 上行橙/下行蓝, 转向即换色(TradingView 那个变色均线)
+  if (S.ind.hma) {
+    var ha = hullArr(kl, 21);
+    ctx.lineWidth = 1.7;
+    for (var hj = Math.max(i0, 1); hj < i1; hj++) {
+      if (ha[hj] == null || ha[hj - 1] == null) continue;
+      ctx.strokeStyle = ha[hj] >= ha[hj - 1] ? "#f0a030" : "#57a7ff";
+      ctx.beginPath(); ctx.moveTo(v.X(hj - 1), v.Y(ha[hj - 1])); ctx.lineTo(v.X(hj), v.Y(ha[hj])); ctx.stroke();
+    }
+    var hLast = ha[i1 - 1];
+    if (hLast != null) {
+      var hUp = ha[i1 - 2] != null && hLast >= ha[i1 - 2];
+      ctx.fillStyle = hUp ? "#f0a030" : "#57a7ff"; ctx.font = "9.5px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.fillText("HMA21 " + hLast.toFixed(d2) + (hUp ? " 上行" : " 下行"), v.padL + 4, v.pTop + 18);
+    }
   }
   // 分时走势线（收盘价连线，分钟周期下即看盘软件那条实时走势线；线图模式下不重复叠加；可在指标行关闭）
   if (S.ind.tsline && !S.lineMode) {
@@ -2191,7 +2228,9 @@ function renderDynSupRes(ctx, v, kl, i0, i1) {
     out.sort(function (a, b) { return Math.abs(a - lastC) - Math.abs(b - lastC); });
     return out;
   }
-  var res = dedupe(highs), sup = dedupe(lows);
+  // 压力=现价上方的摆动高, 支撑=现价下方的摆动低(旧版不分侧, 49.09这种"支撑"悬在现价37上方, 看着就像错的)
+  var res = dedupe(highs.filter(function (q) { return q > lastC * 1.002; }));
+  var sup = dedupe(lows.filter(function (q) { return q < lastC * 0.998; }));
   ctx.font = "9px Menlo, monospace"; ctx.textBaseline = "alphabetic";
   var right = v.padL + (v.i1 - v.i0) * v.step;
   res.forEach(function (q, ri) {
@@ -2256,16 +2295,19 @@ function renderTqs(ctx, v) {
       ctx.fillStyle = p0 >= 80 ? "#ff6f66" : "#35d99a";
       ctx.beginPath(); ctx.arc(v.X(i), PY(p0), 1.6, 0, 7); ctx.fill();
     }
-    if ((p0 >= 80 && P2[i - 1] < 80) || (p0 <= 20 && P2[i - 1] > 20)) { // ★=刚进入高/低位区
-      ctx.fillStyle = p0 >= 80 ? "#ffd21f" : "#aeb8c6";
+    if ((p0 >= 80 && P2[i - 1] < 80) || (p0 <= 20 && P2[i - 1] > 20)) { // ★=刚进入高/低位区, 旁边标对应高/低点价
+      var hiZ = p0 >= 80;
+      ctx.fillStyle = hiZ ? "#ffd21f" : "#35d99a";
       ctx.font = "bold 11px -apple-system"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-      ctx.fillText("\u2605", v.X(i), p0 >= 80 ? PY(Math.min(p0 + 14, 118)) : PY(Math.max(p0 - 14, -18)));
+      ctx.fillText("\u2605", v.X(i), hiZ ? PY(Math.min(p0 + 14, 118)) : PY(Math.max(p0 - 14, -18)));
+      ctx.font = "8px Menlo, monospace";
+      ctx.fillText(fwp(hiZ ? S.kl[i][2] : S.kl[i][3]), v.X(i), hiZ ? PY(Math.min(p0 + 24, 128)) : PY(Math.max(p0 - 24, -28)));
     }
   }
   // 标题 + 末端位置读数
   var lastP = Math.round(P2[n0 - 1]);
   ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-  ctx.fillText("强弱T · 近" + N + "根区间位置 · 贴红线=高位 贴绿线=低位 · 点我放大", v.padL + 4, y + 9);
+  ctx.fillText("强弱T · 近" + N + "根区间 · ★=刚进高/低位区(带价位) · 点我放大", v.padL + 4, y + 9);
   ctx.fillStyle = lastP >= 80 ? "#ff6f66" : (lastP <= 20 ? "#35d99a" : "#d9b45c");
   ctx.font = "bold 10px Menlo, monospace"; ctx.textAlign = "right";
   ctx.fillText(String(lastP), right - 2, y + 9);
@@ -2543,7 +2585,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "EMA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"], ["paneTop", "副图上置"]];
+var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"], ["paneTop", "副图上置"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
@@ -2638,6 +2680,7 @@ function applyUrl() {
   } catch (e) {}
 }
 restore();
+try { if (!localStorage.getItem("ks_rtfoff_v1")) { S.ind.rtflow = false; localStorage.setItem("ks_rtfoff_v1", "1"); } } catch (e) {}
 applyUrl();
 buildTabs(); buildPeriods(); buildTools(); buildInds(); syncCollapse();
 loadAll(true);
