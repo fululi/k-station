@@ -69,6 +69,9 @@
   body.rows-off .row { display: none; }
   body.tools-off .row[data-tools], body.tools-off .row[data-inds] { display: none; }
   body.simple #icthelp, body.simple .tpan { display: none; }
+  body.simple .row[data-tabs] { display: none; } /* 内嵌单票: 股票切换行没意义 */
+  body.simple .topbar [data-collapse] { display: none; }
+  body.simple .topbar .btn[onclick] { display: none; } /* 持仓按钮在外层已有 */
   @media (max-width: 480px) {
     .row { gap: 4px; padding: 4px 8px 2px; }
     .row .btn { font-size: 11px; padding: 5px 9px; min-height: 28px; border-radius: 5px; }
@@ -2673,7 +2676,7 @@ function applyUrl() {
       S.ind.tdhl = true;
       S.ind.cost = true; // 成本线保留(用户核心关注)
       S.lineMode = true;
-      S.toolsOff = false; // 指标行可见, 什么都可以开回来, 不再锁死
+      S.toolsOff = true; // simple模式: 画线/指标行收进工具▾(点一下展开),图占满;不污染主站偏好
       document.body.classList.add("simple");
     }
     if ((code || lines) && !S.simple) store();
