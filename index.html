@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-2 强弱T直显+副图画线+双指纵缩">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-3 EMA默认关">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -2733,6 +2733,7 @@ function applyUrl() {
 }
 restore();
 try { if (!localStorage.getItem("ks_rtfoff_v1")) { S.ind.rtflow = false; localStorage.setItem("ks_rtfoff_v1", "1"); } } catch (e) {}
+try { if (!localStorage.getItem("ks_maoff_v1")) { S.ind.ma = false; localStorage.setItem("ks_maoff_v1", "1"); } } catch (e) {} // 用户指定: 打开默认不显示EMA(指标行可手动开回)
 applyUrl();
 try { if (!S.simple && !localStorage.getItem("ks_toolsoff_v1")) { S.toolsOff = true; localStorage.setItem("ks_toolsoff_v1", "1"); store(); } } catch (e) {} // 画线/指标两行默认收进"工具▾"(点一下展开),股票/周期常驻——顶栏从四排瘦成两排
 buildTabs(); buildPeriods(); buildTools(); buildInds(); syncCollapse();
