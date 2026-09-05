@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-10 修主力资金流: 日级双通道(daykline挂自动切kline?klt=101)+失败明示+空数据不再永远加载中+换票清旧数+监测面板不再二次累加">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-11 控盘度近似副图(通达信经典口径+量价佐证)+0906-10资金流修复">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -353,7 +353,7 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线
+  ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true, ctrl: false }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线; ks-0906-11: ctrl=控盘度近似
   triScan: null,
   fflow: [], rtflow: [], floatMV: 0, fflowErr: false, fflowCode: "", rtflowCode: "",
   lineMode: true, drawLock: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
@@ -467,15 +467,17 @@ function view() {
   var macdH = S.ind.macd === false ? 0 : Math.round(avail * 0.13);
   var ddxH = 0;
   var zlyyH = S.ind.zlyy && !noFund(S.active) ? Math.round(avail * 0.09) : 0;
+  var ctrlH = S.ind.ctrl ? Math.round(avail * 0.09) : 0; // 控盘度近似: 纯量价本地计算,ETF也能用
   var rtH = S.ind.rtflow && !noFund(S.active) ? Math.round(avail * 0.10) : 0;
   var tqsH = S.ind.tqs ? Math.round(avail * 0.12) : 0; // 强弱T面板(零轴柱状,全周期可读)
   if (S.bigPane === "vol") volH = Math.round(avail * 0.32);
   else if (S.bigPane === "macd" && macdH) macdH = Math.round(avail * 0.32);
   else if (S.bigPane === "zlyy" && zlyyH) zlyyH = Math.round(avail * 0.32);
+  else if (S.bigPane === "ctrl" && ctrlH) ctrlH = Math.round(avail * 0.32);
   else if (S.bigPane === "rt" && rtH) rtH = Math.round(avail * 0.32);
   else if (S.bigPane === "tqs" && tqsH) tqsH = Math.round(avail * 0.32);
-  var subN = (volH ? 1 : 0) + (macdH ? 1 : 0) + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0) + (rtH ? 1 : 0) + (tqsH ? 1 : 0);
-  var priceH = avail - volH - macdH - ddxH - zlyyH - rtH - tqsH - 6 * subN;
+  var subN = (volH ? 1 : 0) + (macdH ? 1 : 0) + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0) + (ctrlH ? 1 : 0) + (rtH ? 1 : 0) + (tqsH ? 1 : 0);
+  var priceH = avail - volH - macdH - ddxH - zlyyH - ctrlH - rtH - tqsH - 6 * subN;
   if (!S.count) { // ks-0906-7: 分钟级默认从当日开盘看起(1日窗口), 日周月仍按屏宽自适应
     if (S.klt === "5D") S.count = 240;
     else if (S.klt === "101" || S.klt === "102" || S.klt === "103") S.count = Math.max(30, Math.round(plotW / 6.5));
@@ -505,13 +507,14 @@ function view() {
   var rtY = macdY + macdH + 6;
   var ddxY = rtY + (rtH ? rtH + 6 : 0);
   var zlyyY = ddxY + (ddxH ? ddxH + 6 : 0);
-  var tqsY = zlyyY + (zlyyH ? zlyyH + 6 : 0);
-  var bottom = S.ind.paneTop ? pTop + priceH : (tqsH ? tqsY + tqsH : (zlyyH ? zlyyY + zlyyH : (ddxH ? ddxY + ddxH : (rtH ? rtY + rtH : macdY + macdH))));
+  var ctrlY = zlyyY + (zlyyH ? zlyyH + 6 : 0);
+  var tqsY = ctrlY + (ctrlH ? ctrlH + 6 : 0);
+  var bottom = S.ind.paneTop ? pTop + priceH : (tqsH ? tqsY + tqsH : (ctrlH ? ctrlY + ctrlH : (zlyyH ? zlyyY + zlyyH : (ddxH ? ddxY + ddxH : (rtH ? rtY + rtH : macdY + macdH)))));
   return {
     w: w, hh: hh, i0: i0, i1: i1, n: n, step: step, padL: padL, padR: padR, padT: padT,
     priceH: priceH, pTop: pTop, volY: volY, volH: volH, macdY: macdY, macdH: macdH, vMax: vMax,
     rtY: rtY, rtH: rtH,
-    ddxY: ddxY, ddxH: ddxH, zlyyY: zlyyY, zlyyH: zlyyH, tqsY: tqsY, tqsH: tqsH, bottom: bottom,
+    ddxY: ddxY, ddxH: ddxH, zlyyY: zlyyY, zlyyH: zlyyH, ctrlY: ctrlY, ctrlH: ctrlH, tqsY: tqsY, tqsH: tqsH, bottom: bottom,
     X: function (i) { return padL + (i - i0 + 0.5) * step; },
     I: function (x) { return Math.max(0, Math.min(n - 1, Math.round(i0 + (x - padL) / step - 0.5))); },
     Y: function (p) { return pTop + (hi - p) / (hi - lo) * priceH; },
@@ -557,6 +560,7 @@ function paneLabelAt(v, x, y) {
   if (v.macdH && inLbl(v.macdY, v.macdH)) return "macd";
   if (v.rtH && inLbl(v.rtY, v.rtH)) return "rt";
   if (v.zlyyH && inLbl(v.zlyyY, v.zlyyH)) return "zlyy";
+  if (v.ctrlH && inLbl(v.ctrlY, v.ctrlH)) return "ctrl";
   if (v.tqsH && inLbl(v.tqsY, v.tqsH)) return "tqs";
   return null;
 }
@@ -567,6 +571,7 @@ function paneAt(v, y) {
   if (v.macdH && y >= v.macdY && y <= v.macdY + v.macdH) return "macd";
   if (v.rtH && y >= v.rtY && y <= v.rtY + v.rtH) return "rt";
   if (v.zlyyH && y >= v.zlyyY && y <= v.zlyyY + v.zlyyH) return "zlyy";
+  if (v.ctrlH && y >= v.ctrlY && y <= v.ctrlY + v.ctrlH) return "ctrl";
   if (v.tqsH && y >= v.tqsY && y <= v.tqsY + v.tqsH) return "tqs";
   return null;
 }
@@ -1103,6 +1108,7 @@ function draw() {
   renderBSMeasure(ctx, v); // ks-0906-8: B1→S1 测幅箭头(差几元/几点直接标图上)
   ctx.restore();
   renderRtflow(ctx, v);
+  renderCtrl(ctx, v);
   renderTqs(ctx, v);
   renderExtraPanes(ctx, v);
   // 十字线 + 信息卡
@@ -1118,6 +1124,7 @@ function draw() {
       { y: v.rtY, h: v.rtH, id: "rt" },
       { y: v.ddxY, h: v.ddxH, id: "ddx" },
       { y: v.zlyyY, h: v.zlyyH, id: "zlyy" },
+      { y: v.ctrlY, h: v.ctrlH, id: "ctrl" },
       { y: v.tqsY, h: v.tqsH, id: "tqs" }];
     var curP = null;
     for (var xpi = 0; xpi < xps.length; xpi++) { var xp = xps[xpi]; if (xp.h > 0 && ry >= xp.y && ry <= xp.y + xp.h) { curP = xp; break; } }
@@ -2878,6 +2885,90 @@ function renderMonitor(ctx, v) {
   });
   S.monRect = { x: bx, y: by, w: bw4 + 26, h: bh };
 }
+/* ================= 控盘度近似副图（ks-0906-11） =================
+   口径: 通达信经典"控盘程度"公式(B1-B6, 35根HHV/LLV价位分布+SMA平滑, 全网公开源码) + 近20根量价佐证(缩量抗跌/放量滞涨/放量下跌)。
+   诚实边界: 这是价量行为估算, 不是交易所真实持仓数据; 各家App的"控盘度"都是此类私货算法, 本指标至少公式公开可复算。 */
+function ctrlCalc(kl) {
+  var n = kl.length, out = new Array(n).fill(null);
+  if (n < 40) return out;
+  var b2 = null, b4s = null, b5s = null;
+  for (var i = 34; i < n; i++) {
+    var hh = -1e18, ll = 1e18;
+    for (var j = i - 34; j <= i; j++) { if (kl[j][2] > hh) hh = kl[j][2]; if (kl[j][3] < ll) ll = kl[j][3]; }
+    var rg = hh - ll; if (!(rg > 0)) continue;
+    var c = kl[i][4];
+    var b1 = (hh - c) / rg * 100 - 35;
+    var b3 = (c - ll) / rg * 100;
+    b2 = b2 == null ? b1 : (b1 + b2 * 34) / 35;    // SMA(B1,35,1)
+    b4s = b4s == null ? b3 : (b3 + b4s * 2) / 3;   // SMA(B3,3,1)
+    b5s = b5s == null ? b4s : (b4s + b5s * 2) / 3; // SMA(B4,3,1)
+    var b6 = (b5s + 100) - (b2 + 100);             // B6 = SMA(B4,3,1)+100 - (SMA(B1,35,1)+100)
+    out[i] = b6 > 1 ? (b6 - 1) * 2.5 : 0;
+  }
+  return out;
+}
+function ctrlVolTags(kl) { // 近20根量价佐证统计
+  var n = kl.length, from = Math.max(1, n - 20), i, vs = 0;
+  for (i = from; i < n; i++) vs += kl[i][5];
+  var maV = vs / (n - from) || 1;
+  var kd = 0, zz = 0, fd = 0;
+  for (i = from; i < n; i++) {
+    var chg = kl[i][4] / kl[i - 1][4] - 1, r = kl[i][5] / maV;
+    if (chg >= -0.005 && r < 0.8) kd++;       // 缩量抗跌: 跌不动还缩量 = 筹码被锁
+    if (Math.abs(chg) < 0.01 && r > 1.8) zz++; // 放量滞涨: 量大价不动 = 有人出货
+    if (chg < -0.02 && r > 1.5) fd++;          // 放量下跌: 真砸盘
+  }
+  return { kd: kd, zz: zz, fd: fd };
+}
+function renderCtrl(ctx, v) {
+  if (!S.ind.ctrl) return;
+  var kl = S.kl, n = kl.length;
+  var y2 = v.ctrlY, h2 = v.ctrlH;
+  var right = v.padL + (v.i1 - v.i0) * v.step;
+  ctx.strokeStyle = GRID; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(v.padL, y2); ctx.lineTo(right, y2); ctx.stroke();
+  ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("控盘度·近似（价位口径+量价佐证·非真实持仓）", v.padL + 4, y2 + 9);
+  var cs = ctrlCalc(kl);
+  var cMax = 120, i2;
+  for (i2 = v.i0; i2 < v.i1; i2++) if (cs[i2] != null && cs[i2] > cMax) cMax = cs[i2];
+  var ZY = function (val) { return y2 + h2 - 3 - val / cMax * (h2 - 16); };
+  // 100高控盘虚线
+  if (cMax > 110) {
+    ctx.strokeStyle = "rgba(255,111,102,0.35)"; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(v.padL, ZY(100)); ctx.lineTo(right, ZY(100)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(255,111,102,0.55)"; ctx.font = "8px Menlo, monospace"; ctx.textAlign = "right";
+    ctx.fillText("高控盘100", right - 4, ZY(100) - 2);
+  }
+  // 柱: >100红 / 50-100橙 / >0黄 (通达信原版配色)
+  var bw = Math.max(1, v.step * 0.55);
+  for (i2 = v.i0; i2 < v.i1; i2++) {
+    var val = cs[i2];
+    if (val == null || val <= 0) continue;
+    ctx.fillStyle = val >= 100 ? "#ff6f66" : (val >= 50 ? "#ff9a5c" : "#e8c568");
+    var x2 = v.X(i2) - bw / 2, yt = ZY(val);
+    ctx.fillRect(x2, yt, bw, ZY(0) - yt);
+  }
+  // 右端读数 + 级别
+  var li3 = v.i1 - 1, cur = null;
+  for (i2 = Math.min(n - 1, li3); i2 >= v.i0; i2--) { if (cs[i2] != null) { cur = cs[i2]; break; } }
+  if (cur != null) {
+    var lv = cur >= 100 ? "高控盘" : (cur >= 50 ? "中控盘" : (cur > 0 ? "低控盘" : "无控盘"));
+    var lc = cur >= 100 ? "#ff6f66" : (cur >= 50 ? "#ff9a5c" : (cur > 0 ? "#e8c568" : DIM));
+    ctx.font = "bold 9.5px Menlo, monospace"; ctx.textAlign = "right";
+    ctx.fillStyle = lc;
+    ctx.fillText(lv + " " + Math.round(cur), right - 4, y2 + 9);
+  }
+  // 近20根量价佐证(标题行右侧, 不压柱子)
+  var tg = ctrlVolTags(kl);
+  ctx.font = "8.5px -apple-system, sans-serif"; ctx.textAlign = "left";
+  ctx.fillStyle = tg.kd >= 3 ? "#4fd79b" : DIM;
+  ctx.fillText("缩量抗跌×" + tg.kd, v.padL + 216, y2 + 9);
+  ctx.fillStyle = tg.zz >= 2 ? "#ff8a80" : DIM;
+  ctx.fillText("放量滞涨×" + tg.zz, v.padL + 274, y2 + 9);
+  ctx.fillStyle = tg.fd >= 2 ? "#ff8a80" : DIM;
+  ctx.fillText("放量下跌×" + tg.fd, v.padL + 332, y2 + 9);
+}
 /* ================= 主力净额副图（东财日级真实口径：超大单+大单净额，一条线看方向） ================= */
 function renderExtraPanes(ctx, v) {
   if (!S.ind.zlyy || noFund(S.active)) return;
@@ -2917,7 +3008,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["solid", "实线"], ["paneTop", "副图上置"]];
+var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["ctrl", "控盘度"], ["solid", "实线"], ["paneTop", "副图上置"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
