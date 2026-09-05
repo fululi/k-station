@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-9 信号文案按回测结论分级: 触撑改观察/小周期破轨去强指令">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-10 修主力资金流: 日级双通道(daykline挂自动切kline?klt=101)+失败明示+空数据不再永远加载中+换票清旧数+监测面板不再二次累加">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -277,17 +277,36 @@ function searchCode(kw, cb) {
   setTimeout(function () { fin(null); }, 8000);
 }
 // 日级资金流历史（东财）：f51日期 f52主力净额(元) f57主力净占比%
+// ks-0906-10: daykline端点会整个挂掉(onerror)造成永远"加载中" → 双通道竞速, 备用通道=fflow/kline?klt=101(与分钟资金流同族,实测稳定)
 function fetchFFlow(code, cb) {
-  var url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?secid=" + secidOf(code) +
-    "&ut=" + UT + "&lmt=320&end=20500101&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57";
-  jsonp(url, function (err, d) {
-    if (err || !d || !d.data || !d.data.klines) { if (cb) cb(err || new Error("无资金流")); return; }
-    S.fflow = d.data.klines.map(function (row) {
-      var p = row.split(",");
-      return { d: p[0], main: +p[1], mainPct: +p[6] };
-    });
+  var sec = "secid=" + secidOf(code) + "&ut=" + UT + "&lmt=320&fields1=f1,f2,f3,f7";
+  var done = false;
+  function win(rows) {
+    if (done) return; done = true;
+    if (code !== S.active) return; // 换票后晚到的旧数据直接丢弃
+    S.fflow = rows; S.fflowErr = false; S.fflowCode = code;
     if (cb) cb(null);
-  });
+  }
+  function lose() { if (!done) { done = true; if (code !== S.active) return; S.fflowErr = true; if (cb) cb(new Error("无资金流")); } }
+  jsonp("https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?" + sec + "&end=20500101&fields2=f51,f52,f53,f54,f55,f56,f57", function (err, d) {
+    if (done) return;
+    if (!err && d && d.data && d.data.klines && d.data.klines.length) {
+      win(d.data.klines.map(function (row) {
+        var p = row.split(",");
+        return { d: p[0], main: +p[1], mainPct: +p[6] };
+      }));
+    }
+  }, 8000);
+  jsonp("https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?" + sec + "&klt=101&fields2=f51,f52,f53,f54,f55,f56", function (err, d) {
+    if (done) return;
+    if (!err && d && d.data && d.data.klines && d.data.klines.length) {
+      win(d.data.klines.map(function (row) {
+        var p = row.split(",");
+        return { d: p[0].slice(0, 10), main: +p[1], mainPct: null }; // kline通道无f57净占比
+      }));
+    }
+  }, 8000);
+  setTimeout(function () { if (!done) lose(); }, 9000);
 }
 // 盘中分钟级资金流（东财）：f51时间 f52主力净流入/分钟(元) f56超大单 —— 实时主力曲线数据源
 function fetchFFlowMin(code, cb) {
@@ -305,15 +324,16 @@ function fetchFFlowMin(code, cb) {
       var main = parseFloat(p[1]), sup = parseFloat(p[5]);
       rows.push({ t: t, main: isNaN(main) ? 0 : main, sup: isNaN(sup) ? 0 : sup });
     });
-    return rows;
+    return rows.length ? rows : null; // 空数组当失败处理, 不再win([])造成永远"加载中"
   }
   // 双通道竞速：push2his / push2 同时发，谁先返回有效数据用谁（解决加载慢）
   var done = false;
   function win(rows) {
     if (done) return; done = true;
-    S.rtflow = rows; S.rtflowErr = false; if (cb) cb(null);
+    if (code !== S.active) return; // 换票后晚到的旧数据直接丢弃
+    S.rtflow = rows; S.rtflowErr = false; S.rtflowCode = code; if (cb) cb(null);
   }
-  function lose() { if (!done) { done = true; S.rtflowErr = true; if (cb) cb(new Error("无盘中资金流")); } }
+  function lose() { if (!done) { done = true; if (code !== S.active) return; S.rtflowErr = true; if (cb) cb(new Error("无盘中资金流")); } }
   jsonp("https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?" + q, function (err, d) {
     var rows = !err && parse(d);
     if (rows) win(rows); else if (done) {} // 另一通道可能已成功
@@ -335,7 +355,7 @@ var S = {
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
   ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线
   triScan: null,
-  fflow: [], rtflow: [], floatMV: 0,
+  fflow: [], rtflow: [], floatMV: 0, fflowErr: false, fflowCode: "", rtflowCode: "",
   lineMode: true, drawLock: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
 };
 var DRAW = {}; // "code:klt" -> [{type, pts:[{i,p}...]}]
@@ -1816,10 +1836,12 @@ function loadAll(reset) {
       syncTop();
     }
   });
+  // 换票先清资金流旧数据/旧错误态, 避免旧票数字挂在新票图上
+  S.fflow = []; S.rtflow = []; S.fflowErr = false; S.rtflowErr = false;
   if (!noFund(S.active)) {
     fetchFFlow(S.active, function () { draw(); });
     if (S.ind.rtflow) fetchFFlowMin(S.active, function () { draw(); });
-  } else { S.fflow = []; S.rtflow = []; }
+  }
 }
 function inSession() {
   var d = new Date(), wd = d.getDay();
@@ -2759,16 +2781,18 @@ function renderMonitor(ctx, v) {
       }
     }
   }
-  // 3. 主力资金（今日累计 + 近30分钟动向）
+  // 3. 主力资金（今日累计 + 近30分钟动向）—— f52本身即当日累计值, 取末值不再二次累加(之前监测面板还在累加→几百亿笑话的根)
   total++;
   if (S.rtflow.length) {
-    var cum3 = 0, snaps = [];
-    for (var r3 = 0; r3 < S.rtflow.length; r3++) { cum3 += S.rtflow[r3].main; snaps.push(cum3); }
+    var snaps = [];
+    for (var r3 = 0; r3 < S.rtflow.length; r3++) snaps.push(S.rtflow[r3].main);
     var back = Math.max(0, snaps.length - 30);
-    var slope = snaps[snaps.length - 1] - snaps[back];
+    var cum3 = snaps[snaps.length - 1], slope = cum3 - snaps[back];
     var w3 = cum3 / 1e4, sw3 = slope / 1e4;
     if (cum3 > 0) score++;
     rows.push(["主力 " + (w3 >= 0 ? "+" : "") + Math.round(w3) + "万 · 近30分 " + (Math.abs(sw3) < 5 ? "平稳" : ((sw3 >= 0 ? "+" : "") + Math.round(sw3) + "万 " + (slope >= 0 ? "流入" : "流出"))), cum3 >= 0 ? UP : DN]);
+  } else if (S.rtflowErr) {
+    rows.push(["主力 · 加载失败 · 点「刷新」重试", "#ff8a80"]);
   } else {
     rows.push(["主力 · 非交易时段/加载中", "#8fa398"]);
   }
@@ -2866,9 +2890,9 @@ function renderExtraPanes(ctx, v) {
   ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.fillText("主力净额（东财真实口径·每日）", v.padL + 4, y2 + 9);
   if (!isDay || !S.fflow.length) {
-    ctx.fillStyle = DIM; ctx.font = "10px -apple-system, sans-serif";
+    ctx.fillStyle = S.fflowErr ? "#ff8a80" : DIM; ctx.font = "10px -apple-system, sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(isDay ? "资金流数据加载中…" : "日级指标 · 切回日线查看", v.padL + (right - v.padL) / 2, y2 + h2 / 2);
+    ctx.fillText(!isDay ? "日级指标 · 切回日线查看" : (S.fflowErr ? "资金流加载失败 · 东财接口被掐断(关代理/VPN试试) · 点「刷新」重试" : "资金流数据加载中…"), v.padL + (right - v.padL) / 2, y2 + h2 / 2);
     return;
   }
   var fm = {};
