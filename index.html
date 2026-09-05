@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-12 监测面板加资金结构告警(派发/强势)+价流背离检测(拆单吸筹)">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-13 VOL叠加主图开关(省一幅副图,点VOL标签仍可放大)">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -353,7 +353,7 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true, ctrl: false }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线; ks-0906-11: ctrl=控盘度近似
+  ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true, ctrl: false, volMain: false }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线; ks-0906-11: ctrl=控盘度近似; ks-0906-13: volMain=VOL叠加主图省一幅副图
   triScan: null,
   fflow: [], rtflow: [], floatMV: 0, fflowErr: false, fflowCode: "", rtflowCode: "",
   lineMode: true, drawLock: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
@@ -463,7 +463,7 @@ function view() {
   var padL = 6, padR = 56, padT = 10, padB = 18;
   var plotW = w - padL - padR;
   var avail = hh - padT - padB;
-  var volH = Math.round(avail * 0.085);
+  var volH = (S.ind.volMain && S.bigPane !== "vol") ? 0 : Math.round(avail * 0.085); // ks-0906-13: VOL叠加主图时不占副图位(点VOL放大仍出大副图)
   var macdH = S.ind.macd === false ? 0 : Math.round(avail * 0.13);
   var ddxH = 0;
   var zlyyH = S.ind.zlyy && !noFund(S.active) ? Math.round(avail * 0.09) : 0;
@@ -567,7 +567,7 @@ function paneLabelAt(v, x, y) {
 /* ---- 副图双击放大：判断点击落在哪个副图 ---- */
 function paneAt(v, y) {
   if (!v) return null;
-  if (y >= v.volY && y <= v.volY + v.volH) return "vol";
+  if (v.volH && y >= v.volY && y <= v.volY + v.volH) return "vol";
   if (v.macdH && y >= v.macdY && y <= v.macdY + v.macdH) return "macd";
   if (v.rtH && y >= v.rtY && y <= v.rtY + v.rtH) return "rt";
   if (v.zlyyH && y >= v.zlyyY && y <= v.zlyyY + v.zlyyH) return "zlyy";
@@ -884,6 +884,18 @@ function draw() {
   ctx.save();
   ctx.beginPath(); ctx.rect(0, v.pTop - 2, w, v.priceH + 4); ctx.clip();
   var bw = Math.max(1.5, v.step * 0.62);
+  // ks-0906-13: VOL叠加主图 —— 半透明量柱贴在主图价格区底部当背景, 省掉一整幅副图
+  if (S.ind.volMain && !v.volH && v.vMax > 0) {
+    var ovH = Math.round(v.priceH * 0.18), ovBase = v.pTop + v.priceH;
+    for (var oi = i0; oi < i1; oi++) {
+      var ok = kl[oi];
+      ctx.fillStyle = ok[4] >= ok[1] ? "rgba(255,111,102,0.22)" : "rgba(53,217,154,0.22)";
+      var ovh = ok[5] / v.vMax * ovH;
+      ctx.fillRect(v.X(oi) - bw / 2, ovBase - ovh, bw, ovh);
+    }
+    ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left";
+    ctx.fillText("VOL", v.padL + 4, ovBase - ovH - 2);
+  }
   if (S.lineMode) {
     ctx.beginPath();
     for (var lm = i0; lm < i1; lm++) {
@@ -1040,6 +1052,7 @@ function draw() {
     }
   }
   // 成交量副图
+  if (v.volH) {
   var v0 = v.volY;
   ctx.strokeStyle = GRID;
   ctx.beginPath(); ctx.moveTo(v.padL, v0); ctx.lineTo(v.padL + (i1 - i0) * v.step, v0); ctx.stroke();
@@ -1063,6 +1076,7 @@ function draw() {
     }
     ctx.stroke();
   }
+  } // if (v.volH) 收尾 —— VOL叠加主图时此副图不画
   // MACD 副图
   if (v.macdH) {
   var md = macdArr(kl);
@@ -3043,7 +3057,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["ctrl", "控盘度"], ["solid", "实线"], ["paneTop", "副图上置"]];
+var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["ctrl", "控盘度"], ["solid", "实线"], ["volMain", "VOL叠加"], ["paneTop", "副图上置"]];
 function buildInds() {
   var el = document.querySelector("[data-inds]");
   if (!el) return;
