@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-1 线变细+VOL瘦身+画线锁">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-2 强弱T直显+副图画线+双指纵缩">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -558,10 +558,18 @@ function idxMap(v) {
   for (var i = 0; i < S.kl.length; i++) m[S.kl[i][0]] = i;
   return m;
 }
+// 面板感知Y换算: 强弱T副图的值域是0-100, 其余走主图价格轴
+function yOfPane(v, pane, pv) {
+  if (pane === "tqs" && v.tqsH) {
+    var t0 = v.tqsY + 11, b0 = v.tqsY + v.tqsH - 3;
+    return t0 + (100 - pv) / 100 * (b0 - t0);
+  }
+  return v.Y(pv);
+}
 function anchorXY(v, im, a) {
   var i = im[a.d];
   if (i == null) return null;
-  return { x: v.X(i), y: v.Y(a.p), i: i };
+  return { x: v.X(i), y: yOfPane(v, a.pane, a.p), i: i };
 }
 var FIB_R = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.272, 1.618, 2.618];
 var FIB_C = { "0": "#d5e0d8", "0.236": "#7cc0ff", "0.382": "#4af0d8", "0.5": "#d3a6ff", "0.618": "#ffd21f", "0.786": "#ffb066", "1": "#ff8078", "1.272": "#ff74a3", "1.618": "#f577e6", "2.618": "#c678dd" };
@@ -579,7 +587,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
   var pts = ptsOf(v, im, dg.pts);
   if (!pts && (dg.type === "hline" || dg.type === "buy") && dg.pts && dg.pts.length) {
     // 价格线认"价位"不认"日期": 切周期(日↔分钟)后原锚点日期不在新数据里,线照样画
-    pts = [{ x: v.padL + (v.i1 - v.i0) * v.step, y: v.Y(dg.pts[0].p), i: v.i1 - 1 }];
+    pts = [{ x: v.padL + (v.i1 - v.i0) * v.step, y: yOfPane(v, dg.pts[0].pane, dg.pts[0].p), i: v.i1 - 1 }];
   }
   if (!pts) return;
   var right = v.padL + (v.i1 - v.i0) * v.step;
@@ -662,8 +670,8 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     var p1 = dg.pts[0].p, p2 = dg.pts[1].p;
     var fx0 = Math.min(pts[0].x, pts[1].x);
     for (var fi = 0; fi < FIB_R.length; fi++) {
-      var r = FIB_R[fi], pr = p1 + (p2 - p1) * r, yy = v.Y(pr);
-      if (yy < v.pTop - 30 || yy > v.pTop + v.priceH + 30) continue;
+      var r = FIB_R[fi], pr = p1 + (p2 - p1) * r, yy = yOfPane(v, dg.pts[0].pane, pr);
+      if (dg.pts[0].pane !== "tqs" && (yy < v.pTop - 30 || yy > v.pTop + v.priceH + 30)) continue;
       ctx.strokeStyle = FIB_C[String(r)] || "#d5e0d8";
       ctx.lineWidth = r === 0 || r === 1 ? 1 : (r === 0.618 || r === 0.382 ? 0.9 : 0.7);
       ctx.setLineDash(dg.dash ? [7, 5] : (r > 1 ? [4, 4] : []));
@@ -773,10 +781,10 @@ function renderDrawings(ctx, v) {
     hls[hj].y = Math.min(hls[hj].y, yMax);
   }
   hls.forEach(function (h2) { h2.d._ly = h2.y; });
-  for (var i = 0; i < dl.length; i++) renderOneDrawing(ctx, v, im, dl[i], i === S.selected);
+  for (var i = 0; i < dl.length; i++) { var _dg0 = dl[i]; if (_dg0.pts && _dg0.pts[0] && _dg0.pts[0].pane === "tqs") continue; renderOneDrawing(ctx, v, im, _dg0, i === S.selected); }
   hls.forEach(function (h2) { delete h2.d._ly; });
   // 进行中的画线：已落锚点 + 跟随手指的虚影
-  if (S.tool && S.pending.length) {
+  if (S.tool && S.pending.length && S.pending[0].pane !== "tqs") {
     var need = 2;
     for (var t2 = 0; t2 < TOOLS.length; t2++) if (TOOLS[t2][0] === S.tool) need = TOOLS[t2][2];
     var pts = S.pending.slice();
@@ -974,6 +982,24 @@ function draw() {
     ctx.beginPath(); ctx.arc(v.X(liT), v.Y(kl[liT][4]), 2.6, 0, 7); ctx.fill();
   }
   ctx.restore(); // 主图区裁切结束
+  // 强弱T副图画线第二通道(裁在副图区, 与主图画线互不污染; 本作用域自建 dl2/im2)
+  if (v.tqsH) {
+    var dl2 = dlist(), im2 = idxMap(v);
+    var _hasT = false;
+    for (var _ti = 0; _ti < dl2.length; _ti++) { var _dg1 = dl2[_ti]; if (_dg1.pts && _dg1.pts[0] && _dg1.pts[0].pane === "tqs") { _hasT = true; break; } }
+    var _ghostT = S.tool && S.pending.length && S.pending[0].pane === "tqs";
+    if (_hasT || _ghostT) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(v.padL, v.tqsY, (v.i1 - v.i0) * v.step, v.tqsH); ctx.clip();
+      for (var _tj = 0; _tj < dl2.length; _tj++) { var _dg2 = dl2[_tj]; if (!(_dg2.pts && _dg2.pts[0] && _dg2.pts[0].pane === "tqs")) continue; renderOneDrawing(ctx, v, im2, _dg2, _tj === S.selected); }
+      if (_ghostT) {
+        var _gp = S.pending.slice();
+        if (S.ghost) _gp.push(S.ghost);
+        if (_gp.length >= 2 || S.tool === "hline") { ctx.globalAlpha = 0.65; renderOneDrawing(ctx, v, im2, { type: S.tool, pts: _gp }, true); ctx.globalAlpha = 1; }
+      }
+      ctx.restore();
+    }
+  }
   // 成交量副图
   var v0 = v.volY;
   ctx.strokeStyle = GRID;
@@ -1143,7 +1169,7 @@ function hitTest(pt) {
       var fx0 = Math.min(pts[0].x, pts[1].x);
       if (pt.x < fx0 - 12) continue;
       for (var fi = 0; fi < FIB_R.length; fi++) {
-        d = Math.min(d, Math.abs(pt.y - v.Y(p1 + (p2 - p1) * FIB_R[fi])));
+        d = Math.min(d, Math.abs(pt.y - yOfPane(v, dg.pts[0].pane, p1 + (p2 - p1) * FIB_R[fi])));
       }
     }
     else if (t === "tri") {
@@ -1172,8 +1198,13 @@ function toolName(tool) {
 }
 function anchorAt(pt) {
   var v = view(); if (!v || !S.kl.length) return null;
-  var y = Math.max(v.pTop, Math.min(v.pTop + v.priceH, pt.y));
   var i = v.I(pt.x);
+  if (paneAt(v, pt.y) === "tqs") { // 强弱T副图落锚: 值域0-100
+    var t0 = v.tqsY + 11, b0 = v.tqsY + v.tqsH - 3;
+    var ty = Math.max(t0, Math.min(b0, pt.y));
+    return { d: S.kl[i][0], p: Math.round((100 - (ty - t0) / (b0 - t0) * 100) * 10) / 10, pane: "tqs" };
+  }
+  var y = Math.max(v.pTop, Math.min(v.pTop + v.priceH, pt.y));
   return { d: S.kl[i][0], p: v.P(y) };
 }
 function placeAnchor(pt) {
@@ -1208,8 +1239,9 @@ function dragBy(Tx, pt) {
   var v = view(); if (!v) return;
   var dg = dlist()[Tx.idx]; if (!dg) return;
   var di = Math.round((pt.x - Tx.lx) / v.step);
-  var dp = v.P(pt.y) - v.P(Tx.ly);
-  if (!di && Math.abs(dp) < (v.hi - v.lo) / v.priceH * 1.5) return;
+  var _isT = dg.pts && dg.pts[0] && dg.pts[0].pane === "tqs";
+  var dp = _isT && v.tqsH ? (-(pt.y - Tx.ly) / (v.tqsH - 14) * 100) : (v.P(pt.y) - v.P(Tx.ly));
+  if (!di && Math.abs(dp) < (_isT ? 1.2 : (v.hi - v.lo) / v.priceH * 1.5)) return;
   var im = idxMap(v);
   var n = S.kl.length;
   function moveA(a) {
@@ -1217,7 +1249,7 @@ function dragBy(Tx, pt) {
     if (i2 == null) return;
     var ni = Math.max(0, Math.min(n - 1, i2 + di));
     a.d = S.kl[ni][0];
-    a.p = Math.max(0.0001, a.p + dp);
+    a.p = _isT ? Math.max(0, Math.min(100, a.p + dp)) : Math.max(0.0001, a.p + dp);
   }
   if (Tx.ai >= 0) moveA(dg.pts[Tx.ai]);
   else for (var q = 0; q < dg.pts.length; q++) moveA(dg.pts[q]);
@@ -1232,7 +1264,7 @@ cv.addEventListener("touchstart", function (e) {
     if (T && T.lp) { clearTimeout(T.lp); }
     var dx = e.touches[0].clientX - e.touches[1].clientX;
     var dy = e.touches[0].clientY - e.touches[1].clientY;
-    T = { mode: "pinch", d0: Math.sqrt(dx * dx + dy * dy), c0: S.count };
+    T = { mode: "pinch", d0: Math.sqrt(dx * dx + dy * dy), c0: S.count, dy0: Math.abs(dy), z0: S.yZoom };
     return;
   }
   var pt = posT(e.touches[0]);
@@ -1276,6 +1308,8 @@ cv.addEventListener("touchmove", function (e) {
     var d = Math.sqrt(dx * dx + dy * dy);
     if (T.d0 > 0 && d > 0) {
       S.count = Math.max(15, Math.min(250, Math.round(T.c0 * T.d0 / d)));
+      var ady = Math.abs(dy); // 纵向捏合=纵向缩放(往里缩=压扁,往外扩=拉高)
+      if (T.dy0 > 20 && ady > 8) S.yZoom = Math.max(0.3, Math.min(6, T.z0 * ady / T.dy0));
       draw();
     }
     return;
@@ -2686,8 +2720,9 @@ function applyUrl() {
     if (q.get("simple") === "1") {
       S.simple = true;
       // simple默认: 一根线+档位线+成本线+今昨高低+成交量; 指标行保留可手动开回其他
-      ["ma","tsline","lr","boll","monitor","fvg","liq","ms","ob","ddx","zlyy","rtflow","macd","tqs","atri","pdhl","dsup"].forEach(function (k) { S.ind[k] = false; });
+      ["ma","tsline","lr","boll","monitor","fvg","liq","ms","ob","ddx","zlyy","rtflow","macd","atri","pdhl","dsup"].forEach(function (k) { S.ind[k] = false; });
       S.ind.tdhl = true;
+      S.ind.tqs = true; // 强弱T默认直显(用户指定)
       S.ind.cost = true; // 成本线保留(用户核心关注)
       S.lineMode = true;
       S.toolsOff = true; // simple模式: 画线/指标行收进工具▾(点一下展开),图占满;不污染主站偏好
