@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-14 破轨标记精简为BOS+去重(不再叠字)">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-15 美股报价修复(us小写前缀)+时间轴横拉缩放+底部提示5秒自消">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -152,7 +152,7 @@ function jsonp(url, cb, ms) {
   setTimeout(function () { fin(new Error("请求超时")); }, ms || 12000);
 }
 function txPrefix(code, stripSuffix) {
-  if (isUS(code)) { var u = code.toUpperCase(); return stripSuffix ? u.split(".")[0] : u; }
+  if (isUS(code)) { var u = code.slice(2).toUpperCase(); return "us" + (stripSuffix ? u.split(".")[0] : u); } // ks-0906-15: 腾讯接口us前缀必须小写且只加一次, 否则美股报价/K线全挂
   if (/^(sh|sz)/.test(code)) return code;
   return (/^[569]/.test(code) ? "sh" : (/^[03]/.test(code) ? "sz" : "sh")) + code;
 }
@@ -388,7 +388,8 @@ function dlist() { var k = dkey(); if (!DRAW[k]) DRAW[k] = []; return DRAW[k]; }
 /* ================= 图表渲染 ================= */
 var cv = document.querySelector("[data-chart]");
 var hintEl = document.querySelector("[data-hint]");
-function hint(t) { hintEl.innerHTML = t || ""; }
+var _hintT = null;
+function hint(t) { hintEl.innerHTML = t || ""; if (_hintT) clearTimeout(_hintT); if (t) _hintT = setTimeout(function () { hintEl.innerHTML = ""; }, 5000); } // ks-0906-15: 底部黄字提示5秒自动消失,不常驻占地方
 function cls(p) { return p == null || isNaN(p) ? "flat" : (p > 0 ? "up" : (p < 0 ? "down" : "flat")); }
 function dec() { var t = typeOf(S.active); return (t === "ETF" || t === "FJ" || S.active === "515880") ? 3 : 2; }
 function fwp(v) { var d2 = dec(); return v == null || isNaN(v) ? "—" : v.toFixed(d2); }
@@ -1324,6 +1325,9 @@ cv.addEventListener("touchstart", function (e) {
     return;
   }
   var pt = posT(e.touches[0]);
+  // ks-0906-15: TV式时间轴横拉缩放——单指按住底部日期轴左右拖=横向缩放(右拉放大/左拉缩小)
+  var vv0 = view();
+  if (vv0 && !S.tool && pt.y > vv0.bottom + 2) { T = { mode: "hzoom", lx: pt.x, c0: S.count || (vv0.i1 - vv0.i0) }; hint("时间轴缩放 · 右拉放大 左拉缩小"); return; }
   if (S.tool === "freedraw" && !S.drawLock) {
     var aF = anchorAt(pt);
     if (aF) S.pending.push(aF);
@@ -1371,6 +1375,11 @@ cv.addEventListener("touchmove", function (e) {
     return;
   }
   var pt = posT(e.touches[0]);
+  if (T.mode === "hzoom") { // ks-0906-15: 时间轴横拉
+    var hdx = pt.x - T.lx;
+    if (Math.abs(hdx) > 2) { S.count = Math.max(15, Math.min(320, Math.round(T.c0 * Math.pow(1.008, -hdx)))); T.moved = true; draw(); }
+    return;
+  }
   if (T.mode === "yzoom") {
     S.yZoom = Math.max(0.3, Math.min(6, T.z0 * (1 + (T.ly - pt.y) * 0.008)));
     draw();
