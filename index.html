@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-16 全幅图画线(比例落锚)+触线⚡提醒+★收藏栏">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-17 资金幅图默认开+价流背离标记直接画幅图上">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -2824,6 +2824,22 @@ function renderRtflow(ctx, v) {
   ctx.fillText("主力 " + wan(cur), right - 4, y + 9);
   ctx.fillStyle = "#ff9a5c";
   ctx.fillText("超大 " + wan(cumS[last]), right - 4, y + 20);
+  // ks-0906-17: 背离标记直接画在幅图上(不再只是监测面板一行字)——价跌钱进=吃货嫌疑, 价涨钱出=派发嫌疑
+  try {
+    var q2 = S.quote;
+    if (q2 && q2.floatMV > 0 && Math.abs(cur) > 1e-9) {
+      var _th = q2.floatMV * 0.001; // 流通市值0.1%
+      var _dv = null, _dc = null;
+      if (q2.pct < -0.3 && cur > _th) { _dv = "⚠价弱流强·吃货嫌疑"; _dc = "#ffd21f"; }
+      else if (q2.pct > 0.3 && cur < -_th) { _dv = "⚠价强流弱·派发嫌疑"; _dc = "#35d99a"; }
+      if (_dv) {
+        ctx.font = "bold 9.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        var _tw = ctx.measureText(_dv).width;
+        ctx.fillStyle = "rgba(8,12,10,0.8)"; ctx.fillRect(v.padL + 4, y + 22, _tw + 8, 13);
+        ctx.fillStyle = _dc; ctx.fillText(_dv, v.padL + 8, y + 32);
+      }
+    }
+  } catch (e) {}
 }
 /* ================= 量化监测面板（实时信号汇总：BOLL位置/昨高低/主力/ MACD / 缺口） ================= */
 function renderMonitor(ctx, v) {
@@ -3335,7 +3351,7 @@ function applyUrl() {
   } catch (e) {}
 }
 restore();
-try { if (!localStorage.getItem("ks_rtfoff_v1")) { S.ind.rtflow = false; localStorage.setItem("ks_rtfoff_v1", "1"); } } catch (e) {}
+try { if (!localStorage.getItem("ks_rtfon_v2")) { S.ind.rtflow = true; localStorage.setItem("ks_rtfon_v2", "1"); } } catch (e) {} // ks-0906-17: 实时主力幅图默认开(价流背离标记直接画在幅图上)
 try { if (!localStorage.getItem("ks_maoff_v1")) { S.ind.ma = false; localStorage.setItem("ks_maoff_v1", "1"); } } catch (e) {}
 try { if (!localStorage.getItem("ks_fvgoff_v1")) { S.ind.fvg = false; S.ind.liq = false; S.ind.ob = false; localStorage.setItem("ks_fvgoff_v1", "1"); } } catch (e) {}
 try { if (!localStorage.getItem("ks_dsupoff_v1")) { S.ind.dsup = false; localStorage.setItem("ks_dsupoff_v1", "1"); } } catch (e) {} // 旧动态撑压虚线与实时撑压带重复, 默认关(指标行可点回)
