@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-6 双轨趋势线+今日BS直读+截图+出界档位缩标">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-7 活轨+破轨提醒+Fib1.618+内嵌开轨+分钟默认全日">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -456,7 +456,11 @@ function view() {
   else if (S.bigPane === "tqs" && tqsH) tqsH = Math.round(avail * 0.32);
   var subN = (volH ? 1 : 0) + (macdH ? 1 : 0) + (ddxH ? 1 : 0) + (zlyyH ? 1 : 0) + (rtH ? 1 : 0) + (tqsH ? 1 : 0);
   var priceH = avail - volH - macdH - ddxH - zlyyH - rtH - tqsH - 6 * subN;
-  if (!S.count) S.count = S.klt === "5D" ? 240 : Math.max(30, Math.round(plotW / 6.5));
+  if (!S.count) { // ks-0906-7: 分钟级默认从当日开盘看起(1日窗口), 日周月仍按屏宽自适应
+    if (S.klt === "5D") S.count = 240;
+    else if (S.klt === "101" || S.klt === "102" || S.klt === "103") S.count = Math.max(30, Math.round(plotW / 6.5));
+    else S.count = Math.max(16, Math.round(240 / (+S.klt || 5)));
+  }
   S.count = Math.max(15, Math.min(400, S.count));
   var i1 = Math.max(Math.min(S.end || n, n), Math.min(S.count, n));
   var i0 = Math.max(0, i1 - Math.min(S.count, n));
@@ -2022,16 +2026,115 @@ function renderAutoTri(ctx, v) {
     if (iL) sl2.push(g2);
   }
   var right2 = v.padL + (v.i1 - v.i0) * v.step;
+  var futBars = Math.ceil(v.padR / v.step); // ks-0906-7: 轨道延伸进右缘留白,新K线进来自动右推=实时跟随
+  var iEnd = (v.i1 - 1) + futBars;
+  var xEnd = v.padL + (iEnd - v.i0 + 0.5) * v.step;
+  var last2 = n - 1, pc2 = kl[last2][4];
+  var s60b = Math.max(0, n - 60), hi60 = -1e18, lo60 = 1e18;
+  for (var g5 = s60b; g5 < n; g5++) { if (kl[g5][2] > hi60) hi60 = kl[g5][2]; if (kl[g5][3] < lo60) lo60 = kl[g5][3]; }
+  var R60 = hi60 - lo60 || 1;
+  function relevant(val) { return val > lo60 - 0.5 * R60 && val < hi60 + 0.5 * R60; } // 轨道现值必须在近60根价格带±50%内, 否则是垃圾线不画
   function rail(piv, isHigh) {
-    if (piv.length < 2) return;
-    var a2 = piv[piv.length - 2], b2 = piv[piv.length - 1];
-    var pa = isHigh ? kl[a2][2] : kl[a2][3], pb = isHigh ? kl[b2][2] : kl[b2][3];
-    var mm = (pb - pa) / (b2 - a2), bb2 = pa - mm * a2;
-    ctx.strokeStyle = isHigh ? "rgba(255,154,92,0.75)" : "rgba(230,180,60,0.75)";
+    var a2, b2, mm, bb2;
+    // ks-0906-7: 活轨三条件: 锚点后未破线(0.2%容差) + 现值在近60根带内 + 站对边(撑轨在价下/压轨在价上, 站错边=假轨)
+    var chosen = null, broken = null;
+    for (var k4 = piv.length - 1; k4 >= 1 && !chosen; k4--) {
+      var ta = piv[k4 - 1], tb = piv[k4];
+      if (tb - ta < 6) continue; // 跨度太小是毛刺, 不锚
+      var tpa = isHigh ? kl[ta][2] : kl[ta][3], tpb = isHigh ? kl[tb][2] : kl[tb][3];
+      var tmm = (tpb - tpa) / (tb - ta), tbb = tpa - tmm * ta, tpv = tmm * (n - 1) + tbb;
+      if (!relevant(tpv)) continue; // 不在现价附近的轨道没操作意义
+      var alive = true, breakAt = -1;
+      for (var j = tb + 1; j < n; j++) {
+        var lv = tmm * j + tbb;
+        if (isHigh ? kl[j][4] > lv * 1.002 : kl[j][4] < lv * 0.998) { alive = false; breakAt = j; break; }
+      }
+      if (!alive || (isHigh ? tpv < pc2 * 0.997 : tpv > pc2 * 1.003)) {
+        if (!broken) broken = [ta, tb, tmm, tbb, breakAt]; // 记下最近一条破轨/错边轨
+        continue;
+      }
+      chosen = [ta, tb];
+    }
+    if (!chosen && broken) { // 没活轨但有刚破的轨 → 淡画破轨+破位点标记(破撑走人/破压别瞎卖)
+      var bta = broken[0], btb = broken[1], bmm = broken[2], bbb = broken[3], bAt = broken[4];
+      ctx.strokeStyle = isHigh ? "rgba(255,154,92,0.30)" : "rgba(96,214,164,0.30)";
+      ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(v.X(bta), v.Y(bmm * bta + bbb)); ctx.lineTo(xEnd, v.Y(bmm * iEnd + bbb)); ctx.stroke(); ctx.setLineDash([]);
+      if (bAt >= 0) {
+        ctx.font = "bold 10.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillStyle = isHigh ? "#ff8a80" : "#4fd79b";
+        ctx.fillText(isHigh ? "▲破压轨·强势" : "▼破撑轨·走人", v.X(bAt) + 3, v.Y(bmm * bAt + bbb) + (isHigh ? -9 : 10));
+      }
+      a2 = b2 = -1; // 主线交给下方水平防线
+    } else if (chosen) { a2 = chosen[0]; b2 = chosen[1]; }
+    else if (piv.length >= 2) { a2 = piv[piv.length - 2]; b2 = piv[piv.length - 1]; }
+    else { // 摆动点不足时用近40根最值补锚,保证撑/压轨不缺(分时/1分常见)
+      var s0 = Math.max(0, n - 40), bi = s0, g3;
+      for (g3 = s0; g3 < n; g3++) { if (isHigh ? kl[g3][2] > kl[bi][2] : kl[g3][3] < kl[bi][3]) bi = g3; }
+      a2 = piv.length === 1 ? piv[0] : s0; b2 = bi;
+      if (b2 <= a2) b2 = Math.min(n - 1, a2 + 5);
+      if (b2 === a2) return;
+    }
+    if (a2 >= 0) {
+      mm = (isHigh ? kl[b2][2] - kl[a2][2] : kl[b2][3] - kl[a2][3]) / (b2 - a2);
+      bb2 = (isHigh ? kl[a2][2] : kl[a2][3]) - mm * a2;
+    }
+    // 破轨/斜轨离谱/整条轨在当前视口外 → 统一退成"近30根离现价最近的一侧极值"水平防线(撑取价下最近低, 压取价上最近高)
+    var pv0 = a2 >= 0 ? mm * last2 + bb2 : NaN;
+    var yNow = a2 >= 0 ? v.Y(pv0) : NaN;
+    if (a2 < 0 || !relevant(pv0) || yNow < v.pTop + 2 || yNow > v.pTop + v.priceH - 2) {
+      var s1 = Math.max(0, n - 30), bj = -1;
+      for (var g6 = s1; g6 < n; g6++) {
+        var px = isHigh ? kl[g6][2] : kl[g6][3];
+        if (isHigh ? px < pc2 * 0.998 : px > pc2 * 1.002) continue; // 只要正确一侧
+        if (bj < 0 || (isHigh ? px < kl[bj][2] : px > kl[bj][3])) bj = g6;
+      }
+      if (bj < 0) return; // 一侧没值宁可不画
+      a2 = b2 = bj; mm = 0; bb2 = isHigh ? kl[bj][2] : kl[bj][3];
+    }
+    var col = isHigh ? "rgba(255,154,92,0.85)" : "rgba(96,214,164,0.85)"; // 上轨橙=压力轨, 下轨绿=支撑轨
+    ctx.strokeStyle = col;
     ctx.lineWidth = 1; ctx.setLineDash(S.ind.solid ? [] : [7, 4]);
-    ctx.beginPath(); ctx.moveTo(v.X(a2), v.Y(mm * a2 + bb2)); ctx.lineTo(right2, v.Y(mm * (v.i1 - 1) + bb2)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(v.X(a2), v.Y(mm * a2 + bb2)); ctx.lineTo(xEnd, v.Y(mm * iEnd + bb2)); ctx.stroke(); ctx.setLineDash([]);
+    // 右端价签(轨道在最新K线的价位)
+    var pv = mm * last2 + bb2, pe = mm * iEnd + bb2, yE = v.Y(pe);
+    ctx.font = "9.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    if (yE > v.pTop + 6 && yE < v.pTop + v.priceH - 6) {
+      ctx.fillStyle = col; ctx.fillText((isHigh ? "压轨 " : "撑轨 ") + pe.toFixed(dec()), right2 + 2, yE);
+    }
+    // 触轨提醒: 现价贴轨0.3%内 → 压轨S/撑轨B
+    if (pc2 != null && pv > 0 && Math.abs(pc2 / pv - 1) < 0.003) {
+      ctx.font = "bold 10px -apple-system, sans-serif"; ctx.textAlign = "right";
+      ctx.fillStyle = isHigh ? "#ff8a80" : "#4fd79b";
+      ctx.fillText(isHigh ? "触压轨·S" : "触撑轨·B", right2 - 4, v.Y(pv) + (isHigh ? -8 : 11));
+    }
+    // 破轨提醒: 最近3根收盘穿越轨道 → 破压↑(强势,别瞎卖)/破撑↓(破位,先跑)
+    for (var jb = Math.max(b2 + 1, n - 3); jb < n; jb++) {
+      var cPrev = kl[jb - 1][4], cNow = kl[jb][4], lPrev = mm * (jb - 1) + bb2, lNow = mm * jb + bb2;
+      var cross = isHigh ? (cPrev <= lPrev && cNow > lNow) : (cPrev >= lPrev && cNow < lNow);
+      if (cross) {
+        ctx.font = "bold 10.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillStyle = isHigh ? "#ff8a80" : "#4fd79b";
+        ctx.fillText(isHigh ? "▲破压轨·强势" : "▼破撑轨·走人", v.X(jb) + 3, v.Y(lNow) + (isHigh ? -9 : 10));
+        break;
+      }
+    }
   }
   rail(sh2, true); rail(sl2, false);
+  // ks-0906-7: Fib 1.618 扩展位自动画进图里(近60根最高最低定段, 金色横线+右端价签)
+  var s60 = Math.max(0, n - 60), iHi = s60, iLo = s60;
+  for (var g4 = s60; g4 < n; g4++) { if (kl[g4][2] > kl[iHi][2]) iHi = g4; if (kl[g4][3] < kl[iLo][3]) iLo = g4; }
+  var legHi = kl[iHi][2], legLo = kl[iLo][3], legR = legHi - legLo;
+  if (legR > 0 && iHi !== iLo) {
+    var ext = iLo < iHi ? legLo + legR * 1.618 : legHi - legR * 1.618; // 上涨段看上方扩展, 下跌段看下方扩展
+    var yX = v.Y(ext);
+    if (yX > v.pTop + 4 && yX < v.pTop + v.priceH - 4) {
+      ctx.strokeStyle = "rgba(232,197,104,0.7)"; ctx.setLineDash([8, 5]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(v.padL, yX); ctx.lineTo(right2, yX); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font = "9.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "#e8c568"; ctx.fillText("扩1.618 " + ext.toFixed(dec()), right2 + 2, yX);
+    }
+  }
   var tr = triDetect(kl);
   if (!tr) return;
   var xA = v.X(Math.min(tr.apex, n + 25));
@@ -2858,7 +2961,8 @@ function applyUrl() {
     if (q.get("simple") === "1") {
       S.simple = true;
       // simple默认: 一根线+档位线+成本线+今昨高低+成交量; 指标行保留可手动开回其他
-      ["ma","tsline","lr","boll","monitor","fvg","liq","ms","ob","ddx","zlyy","rtflow","macd","atri","pdhl","dsup"].forEach(function (k) { S.ind[k] = false; });
+      ["ma","tsline","lr","boll","monitor","fvg","liq","ms","ob","ddx","zlyy","rtflow","macd","pdhl","dsup"].forEach(function (k) { S.ind[k] = false; });
+      S.ind.atri = true; // ks-0906-7: 内嵌图也要实时撑压轨+趋势线(用户指定)
       S.ind.tdhl = true;
       S.ind.tqs = true; // 强弱T默认直显(用户指定)
       S.ind.cost = true; // 成本线保留(用户核心关注)
