@@ -307,9 +307,9 @@ function fetchFFlowMin(code, cb) {
   var done = false;
   function win(rows) {
     if (done) return; done = true;
-    S.rtflow = rows; if (cb) cb(null);
+    S.rtflow = rows; S.rtflowErr = false; if (cb) cb(null);
   }
-  function lose() { if (!done) { done = true; if (cb) cb(new Error("无盘中资金流")); } }
+  function lose() { if (!done) { done = true; S.rtflowErr = true; if (cb) cb(new Error("无盘中资金流")); } }
   jsonp("https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?" + q, function (err, d) {
     var rows = !err && parse(d);
     if (rows) win(rows); else if (done) {} // 另一通道可能已成功
@@ -640,7 +640,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
       var r = FIB_R[fi], pr = p1 + (p2 - p1) * r, yy = v.Y(pr);
       if (yy < v.pTop - 30 || yy > v.pTop + v.priceH + 30) continue;
       ctx.strokeStyle = FIB_C[String(r)] || "#d5e0d8";
-      ctx.lineWidth = r === 0 || r === 1 ? 2.2 : (r === 0.618 || r === 0.382 ? 1.8 : 1.4);
+      ctx.lineWidth = r === 0 || r === 1 ? 1.2 : (r === 0.618 || r === 0.382 ? 1 : 0.8);
       ctx.setLineDash(dg.dash ? [7, 5] : (r > 1 ? [4, 4] : []));
       ctx.beginPath(); ctx.moveTo(fx0, yy); ctx.lineTo(right, yy); ctx.stroke();
       ctx.setLineDash([]);
@@ -944,6 +944,18 @@ function draw() {
     ctx.fillStyle = kk[4] >= kk[1] ? "rgba(255,111,102,0.55)" : "rgba(53,217,154,0.55)";
     var vh = kk[5] / v.vMax * (v.volH - 10);
     ctx.fillRect(v.X(i) - bw / 2, v0 + v.volH - vh, bw, vh);
+  }
+  // 5日均量细线: 量柱高低一眼有参照
+  if (kl.length >= 5) {
+    ctx.strokeStyle = "rgba(230,180,60,0.9)"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    var vs = Math.max(i0, 4);
+    for (i = vs; i < i1; i++) {
+      var m5 = 0; for (var j = i - 4; j <= i; j++) m5 += kl[j][5]; m5 /= 5;
+      var my = v0 + v.volH - m5 / v.vMax * (v.volH - 10);
+      if (i === vs) ctx.moveTo(v.X(i), my); else ctx.lineTo(v.X(i), my);
+    }
+    ctx.stroke();
   }
   // MACD 副图
   if (v.macdH) {
@@ -2246,7 +2258,7 @@ function renderRtflow(ctx, v) {
   if (!S.rtflow.length) {
     ctx.fillStyle = DIM; ctx.font = "10px -apple-system, sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("非交易时段 / 加载中 · 盘中 60 秒自动刷新", v.padL + (right - v.padL) / 2, y + h / 2);
+    ctx.fillText(S.rtflowErr ? "资金流加载失败 · 东财接口被当前网络掐断(关代理/VPN试试) · 点「刷新」重试" : (inSession() ? "资金流加载中…" : "非交易时段 · 盘中 60 秒自动刷新"), v.padL + (right - v.padL) / 2, y + h / 2);
     return;
   }
   // 时间 → 会话分钟槽位：09:30-11:30 = 0-119，13:00-15:00 = 120-239
