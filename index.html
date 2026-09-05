@@ -1020,10 +1020,13 @@ function draw() {
     ctx.font = "11px -apple-system, sans-serif"; ctx.textAlign = "left";
     var bwMax = 0;
     info.forEach(function (t) { bwMax = Math.max(bwMax, ctx.measureText(t).width); });
-    var bx = v.padL + 6, byy = v.pTop + 18, bh2 = info.length * 16 + 10;
+    var bw2 = bwMax + 16, plotW2 = (i1 - i0) * v.step;
+    // 框躲到鼠标对侧，不挡正在看的 K 线
+    var bx = cx < v.padL + plotW2 / 2 ? v.padL + plotW2 - bw2 - 6 : v.padL + 6;
+    var byy = v.pTop + 18, bh2 = info.length * 16 + 10;
     ctx.fillStyle = "rgba(10,14,11,0.88)";
-    ctx.fillRect(bx, byy, bwMax + 16, bh2);
-    ctx.strokeStyle = "#30433a"; ctx.strokeRect(bx, byy, bwMax + 16, bh2);
+    ctx.fillRect(bx, byy, bw2, bh2);
+    ctx.strokeStyle = "#30433a"; ctx.strokeRect(bx, byy, bw2, bh2);
     info.forEach(function (t, ii) {
       ctx.fillStyle = ii === 0 ? "#d9b45c" : "#c3d2c6";
       ctx.fillText(t, bx + 8, byy + 14 + ii * 16);
