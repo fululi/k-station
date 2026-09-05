@@ -2682,6 +2682,7 @@ function applyUrl() {
 restore();
 try { if (!localStorage.getItem("ks_rtfoff_v1")) { S.ind.rtflow = false; localStorage.setItem("ks_rtfoff_v1", "1"); } } catch (e) {}
 applyUrl();
+try { if (!S.simple && !localStorage.getItem("ks_toolsoff_v1")) { S.toolsOff = true; localStorage.setItem("ks_toolsoff_v1", "1"); store(); } } catch (e) {} // 画线/指标两行默认收进"工具▾"(点一下展开),股票/周期常驻——顶栏从四排瘦成两排
 buildTabs(); buildPeriods(); buildTools(); buildInds(); syncCollapse();
 loadAll(true);
 hint("<span class=dim>长按出十字线 · 点工具画线 ｜ 东财公开数据有延迟 · 画线存本机 · 非投资建议</span>");
