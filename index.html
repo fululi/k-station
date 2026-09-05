@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-13 VOL叠加主图开关(省一幅副图,点VOL标签仍可放大)">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-14 破轨标记精简为BOS+去重(不再叠字)">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -2108,7 +2108,7 @@ function renderAutoTri(ctx, v) {
   function rail(piv, isHigh) {
     var a2, b2, mm, bb2;
     // ks-0906-7: 活轨三条件: 锚点后未破线(0.2%容差) + 现值在近60根带内 + 站对边(撑轨在价下/压轨在价上, 站错边=假轨)
-    var chosen = null, broken = null;
+    var chosen = null, broken = null, markerAt = -1, chosenPv = 0;
     for (var k4 = piv.length - 1; k4 >= 1 && !chosen; k4--) {
       var ta = piv[k4 - 1], tb = piv[k4];
       if (tb - ta < 6) continue; // 跨度太小是毛刺, 不锚
@@ -2124,17 +2124,18 @@ function renderAutoTri(ctx, v) {
         if (!broken) broken = [ta, tb, tmm, tbb, breakAt]; // 记下最近一条破轨/错边轨
         continue;
       }
-      chosen = [ta, tb];
+      chosen = [ta, tb]; chosenPv = tpv;
     }
-    if (!chosen && broken) { // 没活轨但有刚破的轨 → 淡画破轨+破位点标记(破撑走人/破压别瞎卖)
+    if ((!chosen || Math.abs(chosenPv / pc2 - 1) > 0.05) && broken) { // ks-0906-14: 活轨若离现价超5%=远轨没操作意义, 仍亮破位标记
       var bta = broken[0], btb = broken[1], bmm = broken[2], bbb = broken[3], bAt = broken[4];
       ctx.strokeStyle = isHigh ? "rgba(255,154,92,0.30)" : "rgba(96,214,164,0.30)";
       ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
       ctx.beginPath(); ctx.moveTo(v.X(bta), v.Y(bmm * bta + bbb)); ctx.lineTo(xEnd, v.Y(bmm * iEnd + bbb)); ctx.stroke(); ctx.setLineDash([]);
       if (bAt >= 0) {
+        markerAt = bAt; // ks-0906-14: 记下破位标记位置, 下方穿越提醒避免重复堆字
         ctx.font = "bold 10.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
         ctx.fillStyle = isHigh ? "#ff8a80" : "#4fd79b";
-        ctx.fillText(isHigh ? (bigK ? "▲破压轨·强势" : "▲破压轨") : (bigK ? "▼破撑轨·走人" : "▼破撑轨"), v.X(bAt) + 3, v.Y(bmm * bAt + bbb) + (isHigh ? -9 : 10));
+        ctx.fillText(isHigh ? (bigK ? "▲BOS" : "▲破压") : (bigK ? "▼BOS" : "▼破撑"), v.X(bAt) + 3, v.Y(bmm * bAt + bbb) + (isHigh ? -9 : 10));
       }
       a2 = b2 = -1; // 主线交给下方水平防线
     } else if (chosen) { a2 = chosen[0]; b2 = chosen[1]; }
@@ -2183,10 +2184,11 @@ function renderAutoTri(ctx, v) {
     for (var jb = Math.max(b2 + 1, n - 3); jb < n; jb++) {
       var cPrev = kl[jb - 1][4], cNow = kl[jb][4], lPrev = mm * (jb - 1) + bb2, lNow = mm * jb + bb2;
       var cross = isHigh ? (cPrev <= lPrev && cNow > lNow) : (cPrev >= lPrev && cNow < lNow);
-      if (cross) {
+      if (cross && markerAt < 0) { // ks-0906-14: 破轨处已标过就不再叠字
+        markerAt = jb;
         ctx.font = "bold 10.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
         ctx.fillStyle = isHigh ? "#ff8a80" : "#4fd79b";
-        ctx.fillText(isHigh ? (bigK ? "▲破压轨·强势" : "▲破压轨") : (bigK ? "▼破撑轨·走人" : "▼破撑轨"), v.X(jb) + 3, v.Y(lNow) + (isHigh ? -9 : 10));
+        ctx.fillText(isHigh ? (bigK ? "▲BOS" : "▲破压") : (bigK ? "▼BOS" : "▼破撑"), v.X(jb) + 3, v.Y(lNow) + (isHigh ? -9 : 10));
         break;
       }
     }
