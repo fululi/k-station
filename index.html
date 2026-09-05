@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-7 活轨+破轨提醒+Fib1.618+内嵌开轨+分钟默认全日">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-8 B1→S1测幅箭头+档位线默认锁+simple浮动锁钮+EMA/HMA默认关">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -333,7 +333,7 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true, lsr: true },
+  ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线
   triScan: null,
   fflow: [], rtflow: [], floatMV: 0,
   lineMode: true, drawLock: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
@@ -342,7 +342,7 @@ var DRAW = {}; // "code:klt" -> [{type, pts:[{i,p}...]}]
 function store() {
   if (S.simple) return; // simple模式不写本地状态,避免污染常规模式
   try {
-    localStorage.setItem("ksm_v1", JSON.stringify({ v: 3, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed, toolsOff: S.toolsOff, drawLock: S.drawLock }));
+    localStorage.setItem("ksm_v1", JSON.stringify({ v: 4, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed, toolsOff: S.toolsOff, drawLock: S.drawLock }));
   } catch (e) {}
 }
 function restore() {
@@ -360,7 +360,7 @@ function restore() {
     if (o.draw) DRAW = o.draw;
     if (o.collapsed != null) S.collapsed = !!o.collapsed;
     S.toolsOff = (o.toolsOff != null) ? !!o.toolsOff : false; // 画图工具默认展开(用户高频使用画线)
-    if (o.v !== 3) S.ind = { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true, lsr: true };
+    if (o.v !== 4) S.ind = { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true };
   } catch (e) {}
 }
 function dkey() { return S.active + ":" + S.klt; }
@@ -1080,6 +1080,7 @@ function draw() {
   renderCostLine(ctx, v);
   renderMonitor(ctx, v);
   renderDrawings(ctx, v);
+  renderBSMeasure(ctx, v); // ks-0906-8: B1→S1 测幅箭头(差几元/几点直接标图上)
   ctx.restore();
   renderRtflow(ctx, v);
   renderTqs(ctx, v);
@@ -2008,6 +2009,32 @@ function triDetect(kl) {
   var last = n - 1;
   var brk = kl[last][4] > mh * last + bh ? 1 : (kl[last][4] < ml * last + bl ? -1 : 0);
   return { h1: h1, h2: h2, l1: l1, l2: l2, mh: mh, bh: bh, ml: ml, bl: bl, apex: apex, brk: brk };
+}
+// ks-0906-8: B/S档位线测幅标注——B1→S1 竖向双向箭头 + “+X.XX元 · +Y.Y%”, 画在图右缘, 一眼看这一轮T值多少钱
+function renderBSMeasure(ctx, v) {
+  var dl = dlist(), b1 = null, s1 = null;
+  for (var i = 0; i < dl.length; i++) {
+    var d = dl[i];
+    if (d.type !== "hline" || !d.tag || !d.pts || !d.pts.length) continue;
+    if (d.tag === "B1") b1 = d.pts[0].p;
+    else if (d.tag === "S1") s1 = d.pts[0].p;
+  }
+  if (b1 == null || s1 == null || s1 <= b1) return;
+  var yB = v.Y(b1), yS = v.Y(s1);
+  if (yB < v.pTop - 30 || yS > v.pTop + v.priceH + 30) return;
+  var right2 = v.padL + (v.i1 - v.i0) * v.step;
+  var x = right2 - 14;
+  var diff = s1 - b1, pct = diff / b1 * 100;
+  ctx.strokeStyle = "#e8c568"; ctx.fillStyle = "#e8c568"; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(x, yB); ctx.lineTo(x, yS); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - 3, yS + 5); ctx.lineTo(x, yS); ctx.lineTo(x + 3, yS + 5); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - 3, yB - 5); ctx.lineTo(x, yB); ctx.lineTo(x + 3, yB - 5); ctx.closePath(); ctx.fill();
+  var ym = (yB + yS) / 2;
+  var lab = "+" + diff.toFixed(2) + "元 · +" + pct.toFixed(1) + "%";
+  ctx.font = "bold 10px -apple-system, sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  var tw = ctx.measureText(lab).width;
+  ctx.fillStyle = "rgba(8,12,10,0.85)"; ctx.fillRect(x - 6 - tw - 6, ym - 8, tw + 8, 15);
+  ctx.fillStyle = "#e8c568"; ctx.fillText(lab, x - 8, ym);
 }
 function renderAutoTri(ctx, v) {
   if (!S.ind.atri) return;
@@ -2945,7 +2972,7 @@ function applyUrl() {
         if (it.tag === "B") { iB++; it.tag = "B" + iB; }
         else if (it.tag === "S") { iS++; it.tag = "S" + iS; }
       });
-      if (arr.length) S.urlLines = arr;
+      if (arr.length) { S.urlLines = arr; S.drawLock = true; } // ks-0906-8: 带档位线进来默认锁线,防手滑拖动买卖线;点右下🔒或指标行解锁
     }
     // hq-mobile 传今日买卖点: trades=YYYY-MM-DD HH:MM,s|b,价格;... —— 画到K线上(东财那种B/S标记)
     var trades = q.get("trades");
@@ -2969,6 +2996,21 @@ function applyUrl() {
       S.lineMode = true;
       S.toolsOff = true; // simple模式: 画线/指标行收进工具▾(点一下展开),图占满;不污染主站偏好
       document.body.classList.add("simple");
+      // ks-0906-8: simple/内嵌模式指标行收起来了,锁钮会找不到——放一个浮动锁钮在图右下
+      if (!document.getElementById("lockFab")) {
+        var lf = document.createElement("button");
+        lf.id = "lockFab"; lf.type = "button";
+        lf.style.cssText = "position:fixed;right:10px;bottom:88px;z-index:60;width:40px;height:40px;border-radius:20px;border:1px solid #2a3240;background:#161b24;color:#e8c568;font-size:17px;opacity:.92;padding:0";
+        lf.textContent = S.drawLock ? "🔒" : "🔓";
+        lf.addEventListener("click", function () {
+          S.drawLock = !S.drawLock;
+          if (S.drawLock) { S.tool = null; S.pending = []; S.ghost = null; S.selected = -1; }
+          lf.textContent = S.drawLock ? "🔒" : "🔓";
+          store(); buildInds(); syncTools(); draw();
+          hint(S.drawLock ? "画线已锁定 · 买卖线拖不动" : "画线已解锁 · 可拖动画线");
+        });
+        document.body.appendChild(lf);
+      }
     }
     // 无 trades 参数时: 同域读 hq-mobile 的今日做T流水(tlog_v2), 直接打开K站也有B/S标记
     if (!S.urlTrades) {
