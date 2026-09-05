@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-5 买卖配对涨幅箭头+embed票头隐藏+删杂字">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-6 双轨趋势线+今日BS直读+截图+出界档位缩标">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -101,7 +101,7 @@
     pointer-events: none; text-align: right; line-height: 1.5;
   }
   .lnkb { font-size: 10px; color: #8fa398; white-space: nowrap; }
-  body.embed [data-name], body.embed [data-px], body.embed [data-pct], body.embed [data-lnk] { display: none; }
+  body.embed [data-name], body.embed [data-px], body.embed [data-pct], body.embed [data-lnk], body.embed [data-shot] { display: none; }
 </style>
 </head>
 <body data-page-node-id="HNiVlflFjLy4h9C7kZni9s">
@@ -113,7 +113,7 @@
   <span class="spacer" data-page-node-id="AzwYJivdPVw6fwFX70Wnmf"></span>
   <span class="fresh" data-fresh data-page-node-id="aoHc4BpOKvjPbJpJ1rlmZe"></span>
   <button class="btn" onclick="location.href='https://fululi.github.io/hq-mobile/'" type="button" data-page-node-id="3NtQOaQAAfFGJ3sf4xscbD">持仓</button>
-  <button class="btn" data-tooltog type="button" data-page-node-id="JwjND66Ks8BvBYwub38clk">工具▾</button><button class="btn" data-refresh type="button" data-page-node-id="38lK9Gj6883vpCuYZZsAFu">刷新</button>
+  <button class="btn" data-tooltog type="button" data-page-node-id="JwjND66Ks8BvBYwub38clk">工具▾</button><button class="btn" data-shot type="button">截图</button><button class="btn" data-refresh type="button" data-page-node-id="38lK9Gj6883vpCuYZZsAFu">刷新</button>
   <button class="btn" data-collapse type="button" data-page-node-id="g1llVtg9wACH9BCLgTxvfT">收起▲</button>
 </div>
 <div class="row" data-tabs data-page-node-id="WGjvkr8JhFlofUsSfzBIK2"></div>
@@ -650,6 +650,14 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     ctx.beginPath(); ctx.moveTo(v.padL, pts[0].y); ctx.lineTo(right, pts[0].y); ctx.stroke();
     // 标签放左缘深色胶囊(右缘留给昨/今高低), 加粗放大, 不再被裁切
     var lab = (dg.tag ? dg.tag + " " : (t === "buy" ? "买 " : "")) + fwp(dg.pts[0].p);
+    // 出界处理: 价位在可视范围外的线不画大胶囊, 只在边缘留小字+方向箭头(灰化), 价格走近自然恢复
+    if (pts[0].y < v.pTop || pts[0].y > v.pTop + v.priceH) {
+      var above = pts[0].y < v.pTop;
+      ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(141,163,152,0.55)";
+      ctx.fillText((above ? "↑" : "↓") + lab, v.padL + 3, above ? v.pTop + 5 : v.pTop + v.priceH - 5);
+      return;
+    }
     var ly = (dg._ly != null ? dg._ly : pts[0].y);
     ctx.font = "bold 10px Menlo, monospace"; // hq-mobile请求: 小字
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
@@ -840,7 +848,7 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(v.X(di), v.pTop); ctx.lineTo(v.X(di), v.bottom); ctx.stroke();
     var ds = kl[di][0];
     ds = S.klt === "101" ? ds.slice(5) : (S.klt === "102" ? ds.slice(2, 7) : (S.klt === "103" ? ds.slice(0, 7) : ds.slice(5, 16)));
-    ctx.fillStyle = DIM;
+    ctx.fillStyle = "#93a89c"; // 提亮: 五日/分钟级时间原来太暗看不清
     ctx.fillText(ds, v.X(di), v.hh - 9);
   }
   // K线（线图模式：收盘价折线 + 淡色面积）——主图区裁切，防止竖直拖动时穿进副图
@@ -1815,6 +1823,18 @@ function inSession() {
   return (m >= 570 && m <= 690) || (m >= 780 && m <= 905);
 }
 document.querySelector("[data-refresh]").addEventListener("click", function () { loadAll(false); });
+document.querySelector("[data-shot]").addEventListener("click", function () { // 一键截图: 画布直接存png(发群/复盘用)
+  try {
+    cv.toBlob(function (b) {
+      if (!b) return;
+      var a2 = document.createElement("a");
+      a2.href = URL.createObjectURL(b);
+      a2.download = "K站-" + (S.name || S.active) + "-" + new Date().toTimeString().slice(0, 8).replace(/:/g, "") + ".png";
+      a2.click();
+      setTimeout(function () { URL.revokeObjectURL(a2.href); }, 3000);
+    });
+  } catch (e) {}
+});
 document.querySelector("[data-yzin]").addEventListener("click", function () { S.yZoom = Math.min(6, (S.yZoom || 1) * 1.35); store(); draw(); hint("纵向放大 ×" + S.yZoom.toFixed(2) + " · 双击价格轴复位"); });
 document.querySelector("[data-yzout]").addEventListener("click", function () { S.yZoom = Math.max(0.3, (S.yZoom || 1) / 1.35); store(); draw(); hint("纵向缩小 ×" + S.yZoom.toFixed(2) + " · 双击价格轴复位"); });
 // 顶部工具行折叠/展开（手机省屏）
@@ -1989,6 +2009,29 @@ function renderAutoTri(ctx, v) {
   if (!S.ind.atri) return;
   var kl = S.kl, n = kl.length;
   if (n < 40) return;
+  // 双轨趋势线常显(用户指定): 上轨=最近两摆动高连线, 下轨=最近两摆动低连线, 不管是否收敛都画
+  var w5 = 5, sh2 = [], sl2 = [];
+  for (var g2 = w5; g2 < n - w5; g2++) {
+    var iH = true, iL = true;
+    for (var k3 = g2 - w5; k3 <= g2 + w5; k3++) {
+      if (kl[k3][2] > kl[g2][2]) iH = false;
+      if (kl[k3][3] < kl[g2][3]) iL = false;
+      if (!iH && !iL) break;
+    }
+    if (iH) sh2.push(g2);
+    if (iL) sl2.push(g2);
+  }
+  var right2 = v.padL + (v.i1 - v.i0) * v.step;
+  function rail(piv, isHigh) {
+    if (piv.length < 2) return;
+    var a2 = piv[piv.length - 2], b2 = piv[piv.length - 1];
+    var pa = isHigh ? kl[a2][2] : kl[a2][3], pb = isHigh ? kl[b2][2] : kl[b2][3];
+    var mm = (pb - pa) / (b2 - a2), bb2 = pa - mm * a2;
+    ctx.strokeStyle = isHigh ? "rgba(255,154,92,0.75)" : "rgba(230,180,60,0.75)";
+    ctx.lineWidth = 1; ctx.setLineDash(S.ind.solid ? [] : [7, 4]);
+    ctx.beginPath(); ctx.moveTo(v.X(a2), v.Y(mm * a2 + bb2)); ctx.lineTo(right2, v.Y(mm * (v.i1 - 1) + bb2)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  rail(sh2, true); rail(sl2, false);
   var tr = triDetect(kl);
   if (!tr) return;
   var xA = v.X(Math.min(tr.apex, n + 25));
@@ -2823,13 +2866,31 @@ function applyUrl() {
       S.toolsOff = true; // simple模式: 画线/指标行收进工具▾(点一下展开),图占满;不污染主站偏好
       document.body.classList.add("simple");
     }
+    // 无 trades 参数时: 同域读 hq-mobile 的今日做T流水(tlog_v2), 直接打开K站也有B/S标记
+    if (!S.urlTrades) {
+      try {
+        var tl = JSON.parse(localStorage.getItem("tlog_v2") || "[]");
+        var nd = new Date(), ds9 = nd.getFullYear() + "-" + String(nd.getMonth() + 1).padStart(2, "0") + "-" + String(nd.getDate()).padStart(2, "0");
+        var t9 = [];
+        tl.forEach(function (r) {
+          if (r.d !== ds9 || !r.t) return;
+          var rc = (r.code || "").replace(/^(sh|sz)/, ""), ac = S.active.replace(/^(sh|sz)/, "");
+          if (rc !== ac) return;
+          if (r.sell != null) t9.push({ dt: r.d + " " + r.t, side: "s", p: r.sell });
+          if (r.buy != null) t9.push({ dt: r.d + " " + r.t, side: "b", p: r.buy });
+        });
+        if (t9.length) S.urlTrades = t9;
+      } catch (e2) {}
+    }
     if ((code || lines) && !S.simple) store();
   } catch (e) {}
 }
 restore();
 try { if (!localStorage.getItem("ks_rtfoff_v1")) { S.ind.rtflow = false; localStorage.setItem("ks_rtfoff_v1", "1"); } } catch (e) {}
 try { if (!localStorage.getItem("ks_maoff_v1")) { S.ind.ma = false; localStorage.setItem("ks_maoff_v1", "1"); } } catch (e) {}
-try { if (!localStorage.getItem("ks_fvgoff_v1")) { S.ind.fvg = false; S.ind.liq = false; S.ind.ob = false; localStorage.setItem("ks_fvgoff_v1", "1"); } } catch (e) {} // FVG/流动性/订单块与实时撑压带视觉重复, 默认关, 要用指标行点回 // 用户指定: 打开默认不显示EMA(指标行可手动开回)
+try { if (!localStorage.getItem("ks_fvgoff_v1")) { S.ind.fvg = false; S.ind.liq = false; S.ind.ob = false; localStorage.setItem("ks_fvgoff_v1", "1"); } } catch (e) {}
+try { if (!localStorage.getItem("ks_dsupoff_v1")) { S.ind.dsup = false; localStorage.setItem("ks_dsupoff_v1", "1"); } } catch (e) {} // 旧动态撑压虚线与实时撑压带重复, 默认关(指标行可点回)
+try { if (!localStorage.getItem("ks_maoff_v2")) { S.ind.ma = false; localStorage.setItem("ks_maoff_v2", "1"); } } catch (e) {} // EMA再关一次: 用户明确不要默认显示 // FVG/流动性/订单块与实时撑压带视觉重复, 默认关, 要用指标行点回 // 用户指定: 打开默认不显示EMA(指标行可手动开回)
 applyUrl();
 try { if (!S.simple && !localStorage.getItem("ks_toolsoff_v1")) { S.toolsOff = true; localStorage.setItem("ks_toolsoff_v1", "1"); store(); } } catch (e) {} // 画线/指标两行默认收进"工具▾"(点一下展开),股票/周期常驻——顶栏从四排瘦成两排
 buildTabs(); buildPeriods(); buildTools(); buildInds(); syncCollapse();
