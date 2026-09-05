@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title>
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-1 线变细+VOL瘦身+画线锁">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -335,13 +335,13 @@ var S = {
   ind: { ma: true, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: true },
   triScan: null,
   fflow: [], rtflow: [], floatMV: 0,
-  lineMode: true, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
+  lineMode: true, drawLock: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
 };
 var DRAW = {}; // "code:klt" -> [{type, pts:[{i,p}...]}]
 function store() {
   if (S.simple) return; // simple模式不写本地状态,避免污染常规模式
   try {
-    localStorage.setItem("ksm_v1", JSON.stringify({ v: 3, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed, toolsOff: S.toolsOff }));
+    localStorage.setItem("ksm_v1", JSON.stringify({ v: 3, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed, toolsOff: S.toolsOff, drawLock: S.drawLock }));
   } catch (e) {}
 }
 function restore() {
@@ -354,6 +354,7 @@ function restore() {
     if (o.ind) { S.ind = o.ind; if (S.ind.ma == null) S.ind.ma = true; if (S.ind.tsline == null) S.ind.tsline = true; if (S.ind.lr == null || S.ind.lr === true) S.ind.lr = "view"; if (S.ind.solid == null) S.ind.solid = false; if (S.ind.atri == null) S.ind.atri = true; if (S.ind.ddx == null) S.ind.ddx = false; if (S.ind.pdhl == null) S.ind.pdhl = true; if (S.ind.tdhl == null) S.ind.tdhl = true; if (S.ind.rtflow == null) S.ind.rtflow = false; if (S.ind.hma == null) S.ind.hma = true; if (S.ind.boll == null) S.ind.boll = true; if (S.ind.monitor == null) S.ind.monitor = true; if (S.ind.macd == null) S.ind.macd = true; if (S.ind.tqs == null) S.ind.tqs = true; if (S.ind.dsup == null) S.ind.dsup = true; if (S.ind.paneTop == null) S.ind.paneTop = false; if (S.ind.cost == null) S.ind.cost = true; }
     if (o.lineMode != null) S.lineMode = !!o.lineMode;
     if (o.pdhlMode) S.pdhlMode = o.pdhlMode;
+    if (o.drawLock) S.drawLock = true;
     if (o.monOpen != null) S.monOpen = !!o.monOpen;
     if (o.draw) DRAW = o.draw;
     if (o.collapsed != null) S.collapsed = !!o.collapsed;
@@ -441,7 +442,7 @@ function view() {
   var padL = 6, padR = 56, padT = 10, padB = 18;
   var plotW = w - padL - padR;
   var avail = hh - padT - padB;
-  var volH = Math.round(avail * 0.11);
+  var volH = Math.round(avail * 0.085);
   var macdH = S.ind.macd === false ? 0 : Math.round(avail * 0.13);
   var ddxH = 0;
   var zlyyH = S.ind.zlyy && !noFund(S.active) ? Math.round(avail * 0.09) : 0;
@@ -584,7 +585,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
   var right = v.padL + (v.i1 - v.i0) * v.step;
   ctx.strokeStyle = sel ? SEL : "#e6b43c";
   ctx.fillStyle = sel ? SEL : "#e6b43c";
-  ctx.lineWidth = sel ? 1.8 : 1.1;
+  ctx.lineWidth = sel ? 1.5 : 1;
   ctx.setLineDash(dg.dash ? [7, 5] : []);
   ctx.font = "10px -apple-system, sans-serif";
   ctx.textAlign = "left"; ctx.textBaseline = "middle";
@@ -617,7 +618,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
       sd3 = Math.sqrt(sd3 / nn);
       var pxP3 = v.priceH / (v.hi - v.lo);
       [["rgba(232,242,234,0.85)", 0, []], ["rgba(255,111,102,0.85)", 2, S.ind.solid ? [] : [5, 4]], ["rgba(53,217,154,0.85)", -2, S.ind.solid ? [] : [5, 4]]].forEach(function (L5) {
-        ctx.strokeStyle = sel ? SEL : L5[0]; ctx.lineWidth = sel ? 2 : 1.2; ctx.setLineDash(L5[2]);
+        ctx.strokeStyle = sel ? SEL : L5[0]; ctx.lineWidth = sel ? 1.6 : 1.1; ctx.setLineDash(L5[2]);
         ctx.beginPath();
         ctx.moveTo(v.X(iA), v.Y(ic3) - L5[1] * sd3 * pxP3);
         ctx.lineTo(v.X(iB), v.Y(ic3 + sl3 * (nn - 1)) - L5[1] * sd3 * pxP3);
@@ -664,7 +665,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
       var r = FIB_R[fi], pr = p1 + (p2 - p1) * r, yy = v.Y(pr);
       if (yy < v.pTop - 30 || yy > v.pTop + v.priceH + 30) continue;
       ctx.strokeStyle = FIB_C[String(r)] || "#d5e0d8";
-      ctx.lineWidth = r === 0 || r === 1 ? 1.2 : (r === 0.618 || r === 0.382 ? 1 : 0.8);
+      ctx.lineWidth = r === 0 || r === 1 ? 1 : (r === 0.618 || r === 0.382 ? 0.9 : 0.7);
       ctx.setLineDash(dg.dash ? [7, 5] : (r > 1 ? [4, 4] : []));
       ctx.beginPath(); ctx.moveTo(fx0, yy); ctx.lineTo(right, yy); ctx.stroke();
       ctx.setLineDash([]);
@@ -678,7 +679,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     var pc = dg.pts[0].p ? (dg.pts[1].p / dg.pts[0].p - 1) * 100 : 0;
     var colP = pc >= 0 ? UP : DN;
     ctx.strokeStyle = sel ? SEL : colP;
-    ctx.lineWidth = sel ? 2.4 : 1.8;
+    ctx.lineWidth = sel ? 1.8 : 1.3;
     drawSeg(ctx, pts[0], pts[1]);
     var ang = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
     ctx.fillStyle = sel ? SEL : colP;
@@ -713,7 +714,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     for (var li = 0; li < 4; li++) drawSeg(ctx, pts[li], pts[li + 1]);
     ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
     drawSeg(ctx, pts[0], pts[2]); drawSeg(ctx, pts[1], pts[3]); drawSeg(ctx, pts[2], pts[4]);
-    ctx.setLineDash([]); ctx.lineWidth = sel ? 2.4 : 1.6;
+    ctx.setLineDash([]); ctx.lineWidth = sel ? 1.9 : 1.3;
     var P = dg.pts;
     var xa = Math.abs(P[1].p - P[0].p), ab = Math.abs(P[2].p - P[1].p);
     var bc = Math.abs(P[3].p - P[2].p), cd = Math.abs(P[4].p - P[3].p);
@@ -939,7 +940,7 @@ function draw() {
   // 变色均线 Hull MA(21): 上行橙/下行蓝, 转向即换色(TradingView 那个变色均线)
   if (S.ind.hma) {
     var ha = hullArr(kl, 21);
-    ctx.lineWidth = 1.7;
+    ctx.lineWidth = 1.35;
     for (var hj = Math.max(i0, 1); hj < i1; hj++) {
       if (ha[hj] == null || ha[hj - 1] == null) continue;
       ctx.strokeStyle = ha[hj] >= ha[hj - 1] ? "#f0a030" : "#57a7ff";
@@ -1235,7 +1236,7 @@ cv.addEventListener("touchstart", function (e) {
     return;
   }
   var pt = posT(e.touches[0]);
-  if (S.tool === "freedraw") {
+  if (S.tool === "freedraw" && !S.drawLock) {
     var aF = anchorAt(pt);
     if (aF) S.pending.push(aF);
     S.selected = -1;
@@ -1244,13 +1245,13 @@ cv.addEventListener("touchstart", function (e) {
     draw();
     return;
   }
-  if (S.tool) { placeAnchor(pt); T = { mode: "draw" }; return; }
+  if (S.tool && !S.drawLock) { placeAnchor(pt); T = { mode: "draw" }; return; }
   // 右侧价格轴：上下拖动 = 纵向缩放（不影响画图和平移）
   if (pt.x > cv.clientWidth - 64) { T = { mode: "yzoom", ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
   var hit0 = hitTest(pt);
   if (hit0 >= 0) {
     S.selected = hit0;
-    T = { mode: "drag", idx: hit0, ai: pickAnchor(hit0, pt), lx: pt.x, ly: pt.y, x0: pt.x, y0: pt.y, t0: Date.now(), moved: false };
+    T = S.drawLock ? { mode: "idle", x0: pt.x, y0: pt.y, lx: pt.x, ly: pt.y, t0: Date.now(), moved: false } : { mode: "drag", idx: hit0, ai: pickAnchor(hit0, pt), lx: pt.x, ly: pt.y, x0: pt.x, y0: pt.y, t0: Date.now(), moved: false };
     hint("按住拖动：移整线 · 拖黄点：调锚点 · 「删选」删除");
     syncTools(); draw();
     return;
@@ -1370,7 +1371,7 @@ var M = null;
 cv.addEventListener("mousedown", function (e) {
   e.preventDefault();
   var pt = posT(e);
-  if (S.tool === "freedraw") {
+  if (S.tool === "freedraw" && !S.drawLock) {
     var aM = anchorAt(pt);
     if (aM) S.pending.push(aM);
     M = { free: true, lx: pt.x };
@@ -1378,12 +1379,13 @@ cv.addEventListener("mousedown", function (e) {
     draw();
     return;
   }
-  if (S.tool) { placeAnchor(pt); return; }
+  if (S.tool && !S.drawLock) { placeAnchor(pt); return; }
   if (pt.x > cv.clientWidth - 64) { M = { yzoom: true, ly: pt.y, z0: S.yZoom }; hint("价格轴缩放 · 上拉放大 / 下拉缩小 · 双击轴复位"); return; }
   var hit0 = hitTest(pt);
   if (hit0 >= 0) {
     S.selected = hit0;
-    M = { drag: true, idx: hit0, ai: pickAnchor(hit0, pt), lx: pt.x, ly: pt.y, x0: pt.x, y0: pt.y, t0: Date.now(), moved: false, cross: false };
+    if (!S.drawLock) M = { drag: true, idx: hit0, ai: pickAnchor(hit0, pt), lx: pt.x, ly: pt.y, x0: pt.x, y0: pt.y, t0: Date.now(), moved: false, cross: false };
+    else M = { x0: pt.x, y0: pt.y, lx: pt.x, ly: pt.y, t0: Date.now(), moved: false, cross: false };
     hint("按住拖动：移整线 · 拖黄点：调锚点 · 「删选」删除");
     syncTools(); draw();
     return;
@@ -1401,7 +1403,7 @@ cv.addEventListener("mousedown", function (e) {
 });
 cv.addEventListener("mousemove", function (e) {
   var pt = posT(e);
-  if (S.tool) { S.ghost = anchorAt(pt); draw(); return; }
+  if (S.tool && !S.drawLock) { S.ghost = anchorAt(pt); draw(); return; }
   if (!M) {
     // 悬停即出十字线+金额（不用按住），移出画布消失
     S.cross = { x: pt.x, y: pt.y, hover: true };
@@ -1657,8 +1659,9 @@ function buildTools() {
         S.tool = null;
       }
       else {
-        S.tool = t[0]; S.pending = []; S.selected = -1;
-        hint("「" + t[1] + "」已激活 · 在K线上依次点 " + t[2] + " 个点");
+        if (S.drawLock) { hint("画线已锁定 · 先点指标行「🔒画线锁」解锁"); }
+        else { S.tool = t[0]; S.pending = []; S.selected = -1;
+        hint("「" + t[1] + "」已激活 · 在K线上依次点 " + t[2] + " 个点"); }
       }
       syncTools(); draw();
     });
@@ -2128,14 +2131,14 @@ function renderDailyLevels(ctx, v) {
     labels.push({ y: y, t: lbl + " " + p.toFixed(d2), c: col });
   }
   if (showPrev) {
-    lv(prev.hi, "#ffb14d", S.ind.solid ? [] : [5, 4], pre + "高");
-    lv(prev.lo, "#4de3c2", S.ind.solid ? [] : [5, 4], pre + "低");
+    lv(prev.hi, "#ffb14d", S.ind.solid ? [] : [5, 4], pre + "高", 0.85);
+    lv(prev.lo, "#4de3c2", S.ind.solid ? [] : [5, 4], pre + "低", 0.85);
   }
   if (showToday) {
     lv(today.o, "rgba(228,237,230,0.55)", S.ind.solid ? [] : [3, 3], "今开");
-    lv(today.hi, "#ffd21f", [], pre2 + "高", 1.6);
-    lv(today.lo, "#57a7ff", [], pre2 + "低", 1.6);
-    lv(today.c, "#e8f2ea", [], "最新", 1.4);
+    lv(today.hi, "#ffd21f", [], pre2 + "高", 1.15);
+    lv(today.lo, "#57a7ff", [], pre2 + "低", 1.15);
+    lv(today.c, "#e8f2ea", [], "最新", 1.05);
   }
   labels.sort(function (a, b) { return a.y - b.y; });
   for (var li3 = 1; li3 < labels.length; li3++) {
@@ -2604,6 +2607,17 @@ function buildInds() {
     hint(S.pdhlMode === "off" ? "昨高昨低已关闭 · 今高今低由「今高低」钮独立控制" : (S.pdhlMode === "week" ? "显示上周高/低 + 上周蜡烛" : "显示昨日高/低 + 昨日蜡烛"));
   });
   el.appendChild(pb);
+  // 画线锁: 锁住后画图工具不生效、已有画线拖不动, 防手滑误碰(买卖线/画线全部冻住)
+  var lk = document.createElement("button");
+  lk.className = "btn tabbtn" + (S.drawLock ? " on" : "");
+  lk.type = "button"; lk.textContent = S.drawLock ? "🔒画线锁" : "🔓画线";
+  lk.addEventListener("click", function () {
+    S.drawLock = !S.drawLock;
+    if (S.drawLock) { S.tool = null; S.pending = []; S.ghost = null; S.selected = -1; }
+    store(); buildInds(); syncTools(); draw();
+    hint(S.drawLock ? "画线已锁定 · 所有画线拖不动改不了" : "画线已解锁 · 可正常画线拖动");
+  });
+  el.appendChild(lk);
   INDS.forEach(function (t) {
     var b = document.createElement("button");
     b.className = "btn tabbtn" + (S.ind[t[0]] ? " on" : "");
