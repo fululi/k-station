@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-11 控盘度近似副图(通达信经典口径+量价佐证)+0906-10资金流修复">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-12 监测面板加资金结构告警(派发/强势)+价流背离检测(拆单吸筹)">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -293,7 +293,7 @@ function fetchFFlow(code, cb) {
     if (!err && d && d.data && d.data.klines && d.data.klines.length) {
       win(d.data.klines.map(function (row) {
         var p = row.split(",");
-        return { d: p[0], main: +p[1], mainPct: +p[6] };
+        return { d: p[0], main: +p[1], small: +p[2], mid: +p[3], big: +p[4], sup: +p[5], mainPct: +p[6] };
       }));
     }
   }, 8000);
@@ -302,7 +302,7 @@ function fetchFFlow(code, cb) {
     if (!err && d && d.data && d.data.klines && d.data.klines.length) {
       win(d.data.klines.map(function (row) {
         var p = row.split(",");
-        return { d: p[0].slice(0, 10), main: +p[1], mainPct: null }; // kline通道无f57净占比
+        return { d: p[0].slice(0, 10), main: +p[1], small: +p[2], mid: +p[3], big: +p[4], sup: +p[5], mainPct: null }; // kline通道无f57净占比
       }));
     }
   }, 8000);
@@ -2798,6 +2798,19 @@ function renderMonitor(ctx, v) {
     var w3 = cum3 / 1e4, sw3 = slope / 1e4;
     if (cum3 > 0) score++;
     rows.push(["主力 " + (w3 >= 0 ? "+" : "") + Math.round(w3) + "万 · 近30分 " + (Math.abs(sw3) < 5 ? "平稳" : ((sw3 >= 0 ? "+" : "") + Math.round(sw3) + "万 " + (slope >= 0 ? "流入" : "流出"))), cum3 >= 0 ? UP : DN]);
+    // 3b. 价流背离(ks-0906-12): 拆单吸筹在日级分桶会隐身, 但分钟曲线藏不住——价弱而分钟净流入持续上行=疑似隐性吸筹; 反之为隐性派发
+    if (S.quote && S.quote.prev) {
+      var pctNow = (S.quote.price / S.quote.prev - 1) * 100;
+      var th = (S.floatMV ? S.floatMV * 0.001 : 2e7) / 1e4; // 阈值=0.1%流通市值(万), 缺流通市值时按2000万
+      var b60 = Math.max(0, snaps.length - 60), slope60 = cum3 - snaps[b60], sw60 = slope60 / 1e4;
+      if (pctNow <= 0.3 && slope60 > th) {
+        total++; score++;
+        rows.push(["◆ 价弱流强·背离：价" + (pctNow >= 0 ? "+" : "") + pctNow.toFixed(1) + "% 但近60分主力+" + Math.round(sw60) + "万 · 疑似拆单吸筹(L2碎而密)", "#4fd79b"]);
+      } else if (pctNow >= -0.3 && slope60 < -th) {
+        total++;
+        rows.push(["⚠ 价强流弱·背离：价" + (pctNow >= 0 ? "+" : "") + pctNow.toFixed(1) + "% 但近60分主力" + Math.round(sw60) + "万 · 疑似隐性派发", "#ff8a80"]);
+      }
+    }
   } else if (S.rtflowErr) {
     rows.push(["主力 · 加载失败 · 点「刷新」重试", "#ff8a80"]);
   } else {
@@ -2846,6 +2859,28 @@ function renderMonitor(ctx, v) {
       else if (b < 0) { parts.push(nm + "·▼"); dnN++; }
     });
     if (parts.length) rows.push(["多周期三角 " + parts.join(" ") + ((upN + dnN) ? " · " + (upN + dnN) + "周期已突破" : " · 预判等方向"), upN ? UP : (dnN ? DN : "#b78cff")]);
+  }
+  // 8. 资金结构告警(ks-0906-12 回测口径): 主力出+散户大接=派发(反抽减仓) / 主力进+散户出=强势(当天进场结构) / 恐慌日散户必接(123/123)
+  if (S.fflow && S.fflow.length >= 21) {
+    var fL = S.fflow[S.fflow.length - 1];
+    if (fL && fL.small != null && isFinite(fL.small)) {
+      // 分位数自适应阈值: 近60日|主力|的60分位(q80对永鼎这类妖股太钝——它日常就亿级进出, 5亿流出居然只是"日常")
+      var absM = [], lookback = Math.min(60, S.fflow.length - 1);
+      for (var fi2 = S.fflow.length - 1 - lookback; fi2 < S.fflow.length - 1; fi2++) absM.push(Math.abs(S.fflow[fi2].main));
+      absM.sort(function (a, b) { return a - b; });
+      var q60 = absM[Math.floor(absM.length * 0.6)] || 0;
+      var wM = Math.round(fL.main / 1e4), wS = Math.round(fL.small / 1e4);
+      var extreme = Math.abs(fL.main) > q60;
+      if (fL.main < 0 && fL.small > 0 && extreme) {
+        total++;
+        rows.push(["⚠ 派发结构 " + fL.d.slice(5) + "：主力出" + Math.abs(wM) + "万+散户接" + wS + "万 · 反抽减仓别加仓", "#ff8a80"]);
+      } else if (fL.main > 0 && fL.small < 0 && extreme) {
+        total++; score++;
+        rows.push(["◆ 强势结构 " + fL.d.slice(5) + "：主力进" + wM + "万+散户出" + Math.abs(wS) + "万 · 当天进场结构(追高仍谨慎)", "#4fd79b"]);
+      } else {
+        rows.push(["资金结构 " + fL.d.slice(5) + "：主力" + (wM >= 0 ? "+" : "") + wM + "万 / 散户" + (wS >= 0 ? "+" : "") + wS + "万 · 无极端", DIM]);
+      }
+    }
   }
   // 综合评分
   var verdict = score >= total - 0.5 ? "偏多" : (score <= 1 ? "偏空" : "震荡");
