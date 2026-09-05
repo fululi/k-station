@@ -1007,10 +1007,21 @@ function draw() {
   if (S.cross) {
     var ci = v.I(S.cross.x);
     var ck = kl[ci];
-    var cx = v.X(ci), cy = Math.max(v.pTop, Math.min(v.pTop + v.priceH, S.cross.y));
+    var cx = v.X(ci), ry = S.cross.y;
+    // 光标落在哪个面板：主图/VOL/MACD/资金流/强弱T，横线画在对应面板内
+    var xps = [
+      { y: v.pTop, h: v.priceH, id: "main" },
+      { y: v.volY, h: v.volH, id: "vol" },
+      { y: v.macdY, h: v.macdH, id: "macd" },
+      { y: v.rtY, h: v.rtH, id: "rt" },
+      { y: v.ddxY, h: v.ddxH, id: "ddx" },
+      { y: v.zlyyY, h: v.zlyyH, id: "zlyy" },
+      { y: v.tqsY, h: v.tqsH, id: "tqs" }];
+    var curP = null;
+    for (var xpi = 0; xpi < xps.length; xpi++) { var xp = xps[xpi]; if (xp.h > 0 && ry >= xp.y && ry <= xp.y + xp.h) { curP = xp; break; } }
     ctx.strokeStyle = "rgba(228,237,230,0.45)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(cx, v.pTop); ctx.lineTo(cx, v.bottom); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(v.padL, cy); ctx.lineTo(v.padL + (i1 - i0) * v.step, cy); ctx.stroke();
+    if (curP) { ctx.beginPath(); ctx.moveTo(v.padL, ry); ctx.lineTo(v.padL + (i1 - i0) * v.step, ry); ctx.stroke(); }
     ctx.setLineDash([]);
     var prevC = ci > 0 ? kl[ci - 1][4] : ck[1];
     var pct = prevC > 0 ? (ck[4] / prevC - 1) * 100 : 0;
@@ -1031,12 +1042,22 @@ function draw() {
       ctx.fillStyle = ii === 0 ? "#d9b45c" : "#c3d2c6";
       ctx.fillText(t, bx + 8, byy + 14 + ii * 16);
     });
-    // 横线价格标签
-    ctx.fillStyle = "#30433a";
-    var pv = v.P(cy);
-    ctx.fillRect(v.padL + (i1 - i0) * v.step, cy - 8, v.padR, 16);
-    ctx.fillStyle = "#e4ede6"; ctx.font = "10px Menlo, monospace";
-    ctx.fillText(pv.toFixed(d2), v.padL + (i1 - i0) * v.step + 4, cy);
+    // 横线右缘数值标签：主图=价位，VOL=量，MACD=DIF/DEA，强弱T=位置值
+    if (curP) {
+      var lab = null;
+      if (curP.id === "main") lab = v.P(ry).toFixed(d2);
+      else if (curP.id === "vol") lab = "量 " + (ck[5] >= 1e4 ? (ck[5] / 1e4).toFixed(1) + "万" : ck[5]);
+      else if (curP.id === "macd") { var xmd = macdArr(kl); lab = "DIF " + xmd.dif[ci].toFixed(3) + " DEA " + xmd.dea[ci].toFixed(3); }
+      else if (curP.id === "tqs" && S._tqs && S._tqs.pos) lab = "强弱T " + S._tqs.pos[ci].toFixed(0) + (S._tqs.pos[ci] >= 80 ? " 高位" : (S._tqs.pos[ci] <= 20 ? " 低位" : ""));
+      if (lab != null) {
+        ctx.font = "10px Menlo, monospace";
+        var lw = ctx.measureText(lab).width + 8;
+        ctx.fillStyle = "#30433a";
+        ctx.fillRect(v.padL + (i1 - i0) * v.step, ry - 8, Math.max(v.padR, lw), 16);
+        ctx.fillStyle = "#e4ede6";
+        ctx.fillText(lab, v.padL + (i1 - i0) * v.step + 4, ry);
+      }
+    }
   }
 }
 
