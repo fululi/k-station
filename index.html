@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-22 主题挂html根修白板bug+控盘去字加进出场+MACD默认关+沟槽纯价签+K线自动重试">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-23 出场三角修方向+精致化(小三角描边)+图例?弹层+派恐吸洗单字戳(日K·监测同口径)">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -90,6 +90,14 @@
   .yz { position: absolute; right: 60px; top: 12%; display: flex; flex-direction: row; gap: 4px; z-index: 5; opacity: .45; }
   .yz button { width: 22px; height: 22px; border-radius: 11px; background: rgba(16,22,18,0.6); color: #d9b45c; border: 1px solid #3a4a40; font-size: 11px; font-weight: 700; padding: 0; }
   .yz button:active { opacity: 1; }
+  /* ks-0906-23: 图例弹层(点顶栏?开合, 不占图面) */
+  .lgpop { position: absolute; right: 8px; top: 8px; z-index: 25; display: none; max-width: 82vw;
+    background: rgba(10,14,11,0.94); border: 1px solid #2c3a31; border-radius: 10px;
+    padding: 8px 11px; font-size: 11px; line-height: 1.75; color: #c9d6cc; }
+  .lgpop.on { display: block; }
+  .lgpop b { font-weight: 700; }
+  .lgpop .g { color: #35d99a; } .lgpop .r { color: #ff6f66; } .lgpop .y { color: #ffd21f; } .lgpop .o { color: #ff9a5c; }
+  .lgpop .hd { color: #8fa398; font-size: 10px; margin-bottom: 2px; }
   .hint {
     flex: none; font-size: 11.5px; color: #d9b45c; padding: 5px 10px;
     padding-bottom: calc(6px + env(safe-area-inset-bottom));
@@ -116,7 +124,7 @@
   <span class="spacer" data-page-node-id="AzwYJivdPVw6fwFX70Wnmf"></span>
   <span class="fresh" data-fresh data-page-node-id="aoHc4BpOKvjPbJpJ1rlmZe"></span>
   <button class="btn" onclick="location.href='https://fululi.github.io/hq-mobile/'" type="button" data-page-node-id="3NtQOaQAAfFGJ3sf4xscbD">持仓</button>
-  <button class="btn" data-tooltog type="button" data-page-node-id="JwjND66Ks8BvBYwub38clk">工具▾</button><button class="btn" data-theme type="button" title="主题:纯黑→外黑内白→纯白">◐</button><button class="btn" data-shot type="button">截图</button><button class="btn" data-refresh type="button" data-page-node-id="38lK9Gj6883vpCuYZZsAFu">刷新</button>
+  <button class="btn" data-tooltog type="button" data-page-node-id="JwjND66Ks8BvBYwub38clk">工具▾</button><button class="btn" data-legend type="button" title="图例:图上标记都是啥">?</button><button class="btn" data-theme type="button" title="主题:纯黑→外黑内白→纯白">◐</button><button class="btn" data-shot type="button">截图</button><button class="btn" data-refresh type="button" data-page-node-id="38lK9Gj6883vpCuYZZsAFu">刷新</button>
   <button class="btn" data-collapse type="button" data-page-node-id="g1llVtg9wACH9BCLgTxvfT">收起▲</button>
 </div>
 <div class="row" data-tabs data-page-node-id="WGjvkr8JhFlofUsSfzBIK2"></div>
@@ -128,6 +136,16 @@
   <canvas data-chart data-page-node-id="tBlmlXBNXGyUBQ38W5sm3J"></canvas>
   <div class="yz" data-page-node-id="M5km2Nilu3r9diHBiEP7O8"><button type="button" data-yzin title="纵向放大" data-page-node-id="IwXBboDm2CiFJvVpgkdwLQ">＋</button><button type="button" data-yzout title="纵向缩小" data-page-node-id="P1nk2xa8jeHhDX5pW0pAQD">－</button></div>
 <div class="tpan" data-page-node-id="dKei7X02s66kfDU8hLChRw"><button type="button" onclick="panTime(-1)" title="早前" data-page-node-id="soce9cG5d6g4qGXYe79Hch">◀</button><button type="button" onclick="panTime(1)" title="往后" data-page-node-id="rSyCfM0fi4YypF3jRIhJaA">▶</button></div>
+<div class="lgpop" data-lgpop>
+  <div class="hd">图例 · 点?关闭</div>
+  <b class="g">▲</b>主力进场(控盘柱上穿50) · <b class="r">▼</b>主力出场(下穿50)<br>
+  <b class="y">★</b>冲进高位区≥80(过热警戒) · <b class="g">★</b>跌进低位区≤20(超卖)<br>
+  <b class="r">●</b>仍在高位 / <b class="g">●</b>仍在低位 · 连排=单边延续<br>
+  <b class="r">▼破撑</b>收盘破支撑 · <b class="g">▲破压</b>收盘破压力(15分+有效,1/5分仅提醒)<br>
+  撑轨/压轨=动态支撑压力 · 触撑=贴上未破,只观察<br>
+  <b class="r">派</b>主力出散户接(顶) · <b class="r">恐</b>恐慌日大跌(底) · <b class="g">吸</b>主力进散户出(底) · <b class="o">洗</b>主力进价跌(底)<br>
+  <b class="y">▲B/▼S</b>你的买卖画线 · <b class="o">⚠1.618</b>扩展到位别追
+</div>
 </div>
 <div class="hint" data-hint data-page-node-id="IPLikWe2HHiI6TJW4eVqwD">加载中…</div>
 <script>
@@ -1224,6 +1242,7 @@ function draw() {
   renderAutoTri(ctx, v);
   renderDailyLevels(ctx, v);
   renderCostLine(ctx, v);
+  renderFundStamps(ctx, v); // ks-0906-23: 派/恐/吸/洗单字戳(与监测面板同口径)
   renderMonitor(ctx, v);
   renderDrawings(ctx, v);
   renderBSMeasure(ctx, v); // ks-0906-8: B1→S1 测幅箭头(差几元/几点直接标图上)
@@ -2003,6 +2022,10 @@ function inSession() {
   return (m >= 570 && m <= 690) || (m >= 780 && m <= 905);
 }
 document.querySelector("[data-refresh]").addEventListener("click", function () { loadAll(false); });
+document.querySelector("[data-legend]").addEventListener("click", function () { // ks-0906-23: 图例开合
+  var lp = document.querySelector("[data-lgpop]");
+  if (lp) lp.classList.toggle("on");
+});
 document.querySelector("[data-shot]").addEventListener("click", function () { // 一键截图: 画布直接存png(发群/复盘用)
   try {
     cv.toBlob(function (b) {
@@ -3275,20 +3298,52 @@ function renderCtrl(ctx, v) {
     ctx.fillStyle = lc;
     ctx.fillText(lv + " " + Math.round(cur), right - 4, y2 + 9);
   }
-  // ks-0906-22: 主力进/出场标记(控盘柱穿越50=建仓/出清), 直接画在面板上, 替代原量价佐证文字行
+  // ks-0906-23: 进/出场三角精致化(半宽3高7+深色描边, 不怼大不糊); ▲绿底=进场(尖头朝上=建仓) ▼红顶=出场(尖头朝下=出逃, 方向bug已修)
+  ctx.lineWidth = 0.8;
   for (i2 = Math.max(v.i0 + 1, 1); i2 < v.i1; i2++) {
     var cA = cs[i2 - 1], cB = cs[i2];
     if (cA == null || cB == null) continue;
     var x3 = v.X(i2);
     if (cA < 50 && cB >= 50) { // 进场▲绿, 面板底部
       ctx.fillStyle = "#35d99a"; ctx.beginPath();
-      ctx.moveTo(x3, y2 + h2 - 12); ctx.lineTo(x3 - 4, y2 + h2 - 3); ctx.lineTo(x3 + 4, y2 + h2 - 3);
+      ctx.moveTo(x3, y2 + h2 - 10); ctx.lineTo(x3 - 3, y2 + h2 - 3); ctx.lineTo(x3 + 3, y2 + h2 - 3);
       ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(8,12,10,0.85)"; ctx.stroke();
     } else if (cA >= 50 && cB < 50) { // 出场▼红, 面板顶部
       ctx.fillStyle = "#ff6f66"; ctx.beginPath();
-      ctx.moveTo(x3, y2 + 13); ctx.lineTo(x3 - 4, y2 + 22); ctx.lineTo(x3 + 4, y2 + 22);
+      ctx.moveTo(x3 - 3, y2 + 14); ctx.lineTo(x3 + 3, y2 + 14); ctx.lineTo(x3, y2 + 21);
       ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(8,12,10,0.85)"; ctx.stroke();
     }
+  }
+}
+/* ================= 资金结构单字戳(ks-0906-23): 派/恐/吸/洗, 日K专用, 与监测面板同口径(|主力|>近60日60分位才算极端) =================
+   派(顶·浅红)=主力出+散户接 · 恐(底·红)=同上且当日跌>3% · 吸(底·绿)=主力进+散户出 · 洗(底·橙)=主力进+散户出但当日收跌 */
+function renderFundStamps(ctx, v) {
+  if (S.klt !== "101" || !S.fflow || !S.fflow.length || noFund(S.active)) return;
+  var kl = S.kl, fm = {};
+  S.fflow.forEach(function (r) { fm[r.d] = r; });
+  var absM = [], lb = Math.min(60, S.fflow.length - 1);
+  for (var fi = S.fflow.length - 1 - lb; fi < S.fflow.length - 1; fi++) absM.push(Math.abs(S.fflow[fi].main));
+  absM.sort(function (a, b) { return a - b; });
+  var q60 = absM[Math.floor(absM.length * 0.6)] || 0;
+  ctx.font = "bold 7px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (var i = Math.max(v.i0, 1); i < v.i1; i++) {
+    var r = fm[kl[i][0]];
+    if (!r || r.small == null || !isFinite(r.small)) continue;
+    if (Math.abs(r.main) <= q60) continue;
+    var pct = kl[i - 1][4] ? (kl[i][4] / kl[i - 1][4] - 1) * 100 : 0;
+    var ch = null, col = null, top = false;
+    if (r.main < 0 && r.small > 0) {
+      if (pct <= -3) { ch = "恐"; col = "#ff5252"; } else { ch = "派"; col = "#ff8a80"; top = true; }
+    } else if (r.main > 0 && r.small < 0) {
+      if (pct < 0) { ch = "洗"; col = "#ff9a5c"; } else { ch = "吸"; col = "#35d99a"; }
+    }
+    if (!ch) continue;
+    var x = v.X(i), y = top ? v.Y(kl[i][2]) - 8 : v.Y(kl[i][3]) + 8;
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 4.6, 0, 7); ctx.fill();
+    ctx.strokeStyle = "rgba(8,12,10,0.85)"; ctx.lineWidth = 0.8; ctx.stroke();
+    ctx.fillStyle = "#0a0e0b"; ctx.fillText(ch, x, y + 0.5);
   }
 }
 /* ================= 主力净额副图（东财日级真实口径：超大单+大单净额，一条线看方向） ================= */
