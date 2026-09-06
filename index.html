@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-13 主力控盘叠DDX60金线(60日主力净额/成交额): 回测控盘≥50+金线上行后10日+6.8%/57% vs 下行+0.9%/48%, 金线方向=柱子真假验证, 只陈列不加标识">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-14 资金流缓存兜底(限流/凌晨关闸用上次成功数据,面板标·缓存不空窗)+被否强弱T改版分支已删">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -335,10 +335,22 @@ function fetchFFlow(code, cb) {
   function win(rows) {
     if (done) return; done = true;
     if (code !== S.active) return; // 换票后晚到的旧数据直接丢弃
-    S.fflow = rows; S.fflowErr = false; S.fflowCode = code;
+    S.fflow = rows; S.fflowErr = false; S.fflowStale = false; S.fflowCode = code;
+    try { // ks-0907-14: 成功即落缓存(限流/凌晨关闸时兜底用)
+      var allF = JSON.parse(localStorage.getItem("ks_ff_v1") || "{}");
+      allF[code] = { rows: rows };
+      localStorage.setItem("ks_ff_v1", JSON.stringify(allF));
+    } catch (e) {}
     if (cb) cb(null);
   }
-  function lose() { if (!done) { done = true; if (code !== S.active) return; S.fflowErr = true; if (cb) cb(new Error("无资金流")); } }
+  function lose() {
+    if (done) return; done = true; if (code !== S.active) return;
+    try { // ks-0907-14: 缓存兜底——拿不到新数据用上次成功的, 面板标·缓存不空窗
+      var cf = JSON.parse(localStorage.getItem("ks_ff_v1") || "{}")[code];
+      if (cf && cf.rows && cf.rows.length) { S.fflow = cf.rows; S.fflowStale = true; S.fflowErr = false; S.fflowCode = code; if (cb) cb(null); return; }
+    } catch (e) {}
+    S.fflowErr = true; if (cb) cb(new Error("无资金流"));
+  }
   function fire() { // ks-0906-19: 东财限流是常态, 失败自动重试1次再报错
     jsonp("https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?" + sec + "&end=20500101&fields2=f51,f52,f53,f54,f55,f56,f57", function (err, d) {
       if (done) return;
@@ -425,7 +437,7 @@ var S = {
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
   ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true, ctrl: false, volMain: false, vp: false }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线; ks-0906-11: ctrl=控盘度近似; ks-0906-13: volMain=VOL叠加主图省一幅副图; ks-0906-20d: vp=量分布(买卖量剖面)
   triScan: null,
-  fflow: [], rtflow: [], floatMV: 0, fflowErr: false, fflowCode: "", rtflowCode: "",
+  fflow: [], rtflow: [], floatMV: 0, fflowErr: false, fflowStale: false, fflowCode: "", rtflowCode: "",
   lineMode: true, drawLock: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
   favs: [], favPick: false, favHide: false, // ks-0906-16: ★收藏栏(工具/指标点星入栏,取消收藏≠关闭功能)
   theme: "d", // ks-0906-20: d=纯黑 lc=外黑内白 la=纯白
@@ -2040,7 +2052,7 @@ function loadAll(reset) {
     }
   });
   // 换票先清资金流旧数据/旧错误态, 避免旧票数字挂在新票图上
-  S.fflow = []; S.rtflow = []; S.fflowErr = false; S.rtflowErr = false;
+  S.fflow = []; S.rtflow = []; S.fflowErr = false; S.fflowStale = false; S.rtflowErr = false;
   if (!noFund(S.active)) {
     fetchFFlow(S.active, function () { draw(); });
     if (S.ind.rtflow) fetchFFlowMin(S.active, function () { draw(); });
@@ -3339,7 +3351,7 @@ function renderCtrl(ctx, v) {
   ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   // ks-0907-04: 恢复老版量价控盘度(用户定稿): ctrlCalc通达信经典价位口径(35日区间位置平滑), 与价格走势同源=上下必然对得上
   // 柱从底部起高: ≥100红=高控盘 / 50~100橙=中控盘 / >0黄=低控盘; 底绿▲=主力进场(上穿50) 顶红▼=主力离场(跌破50)
-  ctx.fillText("主力控盘", v.padL + 4, y2 + 9);
+  ctx.fillText("主力控盘" + (S.fflowStale ? "·缓存" : ""), v.padL + 4, y2 + 9);
   var cs = ctrlCalc(kl);
   var cMax = 120, i2;
   for (i2 = v.i0; i2 < v.i1; i2++) if (cs[i2] != null && cs[i2] > cMax) cMax = cs[i2];
