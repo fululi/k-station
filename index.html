@@ -3216,6 +3216,22 @@ function renderMonitor(ctx, v) {
       }
     }
   }
+  // 8b. 日级价流背离(ks-0906-28 · div_bt.html 回测口径): 5日价变 vs 5日主力累计
+  // 回测: 隐性派发后5日 个股-1.9%/+0.5%(跑输基准6点) · 隐性吸筹后10日全正但n小 · ETF不适用
+  if (S.klt === "101" && S.fflow && S.fflow.length >= 6 && S.kl.length >= 7) {
+    var kl9 = S.kl, i9 = kl9.length - 1, ff9 = S.fflow;
+    var p5 = kl9[i9 - 5][4] ? (kl9[i9][4] / kl9[i9 - 5][4] - 1) * 100 : 0;
+    var m5 = 0;
+    for (var k9 = ff9.length - 5; k9 < ff9.length; k9++) m5 += ff9[k9].main;
+    var w5 = Math.round(Math.abs(m5) / 1e4);
+    if (p5 >= 3 && m5 < 0) {
+      total++;
+      rows.push(["⚠ 日级背离·隐性派发：5日价+" + p5.toFixed(1) + "% 但主力累计出" + w5 + "万 · 回测:个股后5日-1.9%~+0.5%跑输基准(ETF不适用)", "#ff8a80"]);
+    } else if (p5 <= -3 && m5 > 0) {
+      total++; score++;
+      rows.push(["◆ 日级背离·隐性吸筹：5日价" + p5.toFixed(1) + "% 但主力累计进" + w5 + "万 · 回测:后10日方向全正(样本收集中)", "#4fd79b"]);
+    }
+  }
   // 综合评分
   var verdict = score >= total - 0.5 ? "偏多" : (score <= 1 ? "偏空" : "震荡");
   var vc = verdict === "偏多" ? UP : (verdict === "偏空" ? DN : "#d9b45c");
