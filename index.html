@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-19 资金流自动重试+TV风图标工具行+收藏跨模式持久化+报错文案中性化">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-20 主题三态+B/S档位三角化+LuxAlgo蜡烛轴标+Fib去红配色+强弱T白中线大圆点+量分布剖面">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -102,6 +102,9 @@
   }
   .lnkb { font-size: 10px; color: #8fa398; white-space: nowrap; }
   body.embed [data-name], body.embed [data-px], body.embed [data-pct], body.embed [data-lnk], body.embed [data-shot] { display: none; }
+  /* ks-0906-20: 主题三态 纯黑(默认)/外黑内白(只反画布)/纯白(整页反色) —— invert+hue-rotate(180)保红涨绿跌 */
+  body.theme-lc [data-chart] { filter: invert(0.94) hue-rotate(180deg); }
+  body.theme-la { filter: invert(0.94) hue-rotate(180deg); }
 </style>
 </head>
 <body data-page-node-id="HNiVlflFjLy4h9C7kZni9s">
@@ -113,7 +116,7 @@
   <span class="spacer" data-page-node-id="AzwYJivdPVw6fwFX70Wnmf"></span>
   <span class="fresh" data-fresh data-page-node-id="aoHc4BpOKvjPbJpJ1rlmZe"></span>
   <button class="btn" onclick="location.href='https://fululi.github.io/hq-mobile/'" type="button" data-page-node-id="3NtQOaQAAfFGJ3sf4xscbD">持仓</button>
-  <button class="btn" data-tooltog type="button" data-page-node-id="JwjND66Ks8BvBYwub38clk">工具▾</button><button class="btn" data-shot type="button">截图</button><button class="btn" data-refresh type="button" data-page-node-id="38lK9Gj6883vpCuYZZsAFu">刷新</button>
+  <button class="btn" data-tooltog type="button" data-page-node-id="JwjND66Ks8BvBYwub38clk">工具▾</button><button class="btn" data-theme type="button" title="主题:纯黑→外黑内白→纯白">◐</button><button class="btn" data-shot type="button">截图</button><button class="btn" data-refresh type="button" data-page-node-id="38lK9Gj6883vpCuYZZsAFu">刷新</button>
   <button class="btn" data-collapse type="button" data-page-node-id="g1llVtg9wACH9BCLgTxvfT">收起▲</button>
 </div>
 <div class="row" data-tabs data-page-node-id="WGjvkr8JhFlofUsSfzBIK2"></div>
@@ -361,20 +364,26 @@ var S = {
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
-  ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true, ctrl: false, volMain: false }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线; ks-0906-11: ctrl=控盘度近似; ks-0906-13: volMain=VOL叠加主图省一幅副图
+  ind: { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true, ctrl: false, volMain: false, vp: false }, // ks-0906-8: EMA/变色MA(曲线)默认关,用户要的是直趋势线不要曲线; ks-0906-11: ctrl=控盘度近似; ks-0906-13: volMain=VOL叠加主图省一幅副图; ks-0906-20d: vp=量分布(买卖量剖面)
   triScan: null,
   fflow: [], rtflow: [], floatMV: 0, fflowErr: false, fflowCode: "", rtflowCode: "",
   lineMode: true, drawLock: false, pdhlMode: "day", yZoom: 1, yOff: 0, monOpen: false, collapsed: false, simple: false, // 默认线形走势; simple=从持仓卡打开的简洁模式
   favs: [], favPick: false, favHide: false, // ks-0906-16: ★收藏栏(工具/指标点星入栏,取消收藏≠关闭功能)
+  theme: "d", // ks-0906-20: d=纯黑 lc=外黑内白 la=纯白
 };
+function applyTheme() {
+  document.body.classList.toggle("theme-lc", S.theme === "lc");
+  document.body.classList.toggle("theme-la", S.theme === "la");
+  var tb9 = document.querySelector("[data-theme]"); if (tb9) tb9.textContent = S.theme === "lc" ? "◑" : (S.theme === "la" ? "○" : "◐");
+}
 var DRAW = {}; // "code:klt" -> [{type, pts:[{i,p}...]}]
 function store() {
-  if (S.simple) { // ks-0906-19: 内嵌模式只合并收藏两个键(收藏跨模式要记住), 其余偏好不污染主站
-    try { var o9 = JSON.parse(localStorage.getItem("ksm_v1") || "{}"); o9.v = 4; o9.favs = S.favs; o9.favHide = S.favHide; localStorage.setItem("ksm_v1", JSON.stringify(o9)); } catch (e) {}
+  if (S.simple) { // ks-0906-19: 内嵌模式只合并收藏+主题三个键(跨模式要记住), 其余偏好不污染主站
+    try { var o9 = JSON.parse(localStorage.getItem("ksm_v1") || "{}"); o9.v = 4; o9.favs = S.favs; o9.favHide = S.favHide; o9.theme = S.theme; localStorage.setItem("ksm_v1", JSON.stringify(o9)); } catch (e) {}
     return;
   }
   try {
-    localStorage.setItem("ksm_v1", JSON.stringify({ v: 4, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed, toolsOff: S.toolsOff, drawLock: S.drawLock, favs: S.favs, favHide: S.favHide }));
+    localStorage.setItem("ksm_v1", JSON.stringify({ v: 4, codes: S.codes, active: S.active, klt: S.klt, ind: S.ind, draw: DRAW, lineMode: S.lineMode, pdhlMode: S.pdhlMode, monOpen: S.monOpen, collapsed: S.collapsed, toolsOff: S.toolsOff, drawLock: S.drawLock, favs: S.favs, favHide: S.favHide, theme: S.theme }));
   } catch (e) {}
 }
 function restore() {
@@ -394,6 +403,7 @@ function restore() {
     S.toolsOff = (o.toolsOff != null) ? !!o.toolsOff : false; // 画图工具默认展开(用户高频使用画线)
     if (o.favs && o.favs.length) S.favs = o.favs;
     if (o.favHide != null) S.favHide = !!o.favHide;
+    if (o.theme) { S.theme = o.theme; applyTheme(); }
     if (o.v !== 4) S.ind = { ma: false, tsline: false, lr: false, fvg: false, liq: false, ms: false, ob: false, ddx: false, zlyy: false, pdhl: false, tdhl: true, rtflow: false, boll: false, monitor: true, solid: false, atri: true, macd: true, paneTop: false, cost: true, tqs: true, dsup: true, hma: false, lsr: true };
   } catch (e) {}
 }
@@ -635,7 +645,7 @@ function anchorXY(v, im, a) {
   return { x: v.X(i), y: yOfPane(v, a.pane, a.p), i: i };
 }
 var FIB_R = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.272, 1.618, 2.618];
-var FIB_C = { "0": "#d5e0d8", "0.236": "#7cc0ff", "0.382": "#4af0d8", "0.5": "#d3a6ff", "0.618": "#ffd21f", "0.786": "#ffb066", "1": "#ff8078", "1.272": "#ff74a3", "1.618": "#f577e6", "2.618": "#c678dd" };
+var FIB_C = { "0": "#f2f5f3", "0.236": "#8fa9c9", "0.382": "#57a7ff", "0.5": "#c792ea", "0.618": "#ffd21f", "0.786": "#ff9a5c", "1": "#f2f5f3", "1.272": "#9db8d2", "1.618": "#b48ee8", "2.618": "#7e96b8" }; // ks-0906-20d: 去红化——端点白/0.382亮蓝(与绿强反差)/0.5紫/0.618金/0.786橙/扩展位冷灰蓝, 不与红涨绿跌打架
 function ptsOf(v, im, pts) {
   var out = [];
   for (var k = 0; k < pts.length; k++) {
@@ -725,6 +735,24 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
       return;
     }
     var ly = (dg._ly != null ? dg._ly : pts[0].y);
+    // ks-0906-20 B/S档位线轻量化(对标主流app): 左缘小字无胶囊 + 线右端小三角(B▲在下/S▼在上), 不再大胶囊占位
+    var isBS = dg.auto && /^[BS]\d+$/.test(tag0);
+    if (isBS) {
+      ctx.font = "8.5px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(8,12,10,0.45)";
+      var bsT = tag0 + " " + (dg.pts[0].p != null ? fwp(dg.pts[0].p) : "");
+      var bsW = ctx.measureText(bsT).width;
+      ctx.fillRect(v.padL + 2, pts[0].y - 11, bsW + 4, 10);
+      ctx.fillStyle = sel ? SEL : lc;
+      ctx.fillText(bsT, v.padL + 4, pts[0].y - 6);
+      var tx0 = right - 10, ty0 = pts[0].y;
+      ctx.fillStyle = sel ? SEL : lc;
+      ctx.beginPath();
+      if (tag0.charAt(0) === "B") { ctx.moveTo(tx0, ty0 + 7); ctx.lineTo(tx0 + 4, ty0 + 1.5); ctx.lineTo(tx0 + 8, ty0 + 7); }
+      else { ctx.moveTo(tx0, ty0 - 7); ctx.lineTo(tx0 + 4, ty0 - 1.5); ctx.lineTo(tx0 + 8, ty0 - 7); }
+      ctx.closePath(); ctx.fill();
+      return;
+    }
     ctx.font = "bold 10px Menlo, monospace"; // hq-mobile请求: 小字
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
     var tw = ctx.measureText(lab).width;
@@ -1000,6 +1028,7 @@ function draw() {
     ctx.fillRect(x - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yc - yo)));
   }
   // v2: 我的买卖点(今日做T记录) —— 绿▲买 红▼卖, 东财同款直观
+  renderVP(ctx, v); // ks-0906-20d: 量分布(买卖量剖面)压在K线层之上、线/字层之下
   renderDynSupRes(ctx, v, kl, i0, i1);
   renderLuxSR(ctx, v, kl, i0, i1);
   renderTradeMarks(ctx, v, kl, i0, i1);
@@ -1988,6 +2017,11 @@ function syncCollapse() {
 document.querySelector("[data-tooltog]").addEventListener("click", function () {
   S.toolsOff = !S.toolsOff; store(); syncCollapse();
 });
+// ks-0906-20 主题三态:纯黑→外黑内白→纯白
+document.querySelector("[data-theme]").addEventListener("click", function () {
+  S.theme = S.theme === "d" ? "lc" : (S.theme === "lc" ? "la" : "d");
+  applyTheme(); store(); hint(S.theme === "lc" ? "外黑内白" : (S.theme === "la" ? "纯白" : "纯黑"));
+});
 document.querySelector("[data-collapse]").addEventListener("click", function () {
   S.collapsed = !S.collapsed; store(); syncCollapse();
 });
@@ -2259,17 +2293,15 @@ function renderAutoTri(ctx, v) {
     ctx.strokeStyle = col;
     ctx.lineWidth = 1; ctx.setLineDash(S.ind.solid ? [] : [7, 4]);
     ctx.beginPath(); ctx.moveTo(v.X(a2), v.Y(mm * a2 + bb2)); ctx.lineTo(xEnd, v.Y(mm * iEnd + bb2)); ctx.stroke(); ctx.setLineDash([]);
-    // 右端价签(轨道在最新K线的价位)
+    // 右端价签(轨道在最新K线的价位) — ks-0906-20c: 挪回图内右端(右对齐,压在轨道延伸段留白上), 沟槽让给昨今蜡烛轴标; 触轨提醒合并进同一行
     var pv = mm * last2 + bb2, pe = mm * iEnd + bb2, yE = v.Y(pe);
-    ctx.font = "9.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    // 触轨: 现价贴轨0.3%内 → ks-0906-9回测证伪"触撑即买"(胜率36-48%均值负), 撑轨只给中性观察, 压轨保留S
+    var touching = (pc2 != null && pv > 0 && Math.abs(pc2 / pv - 1) < 0.003);
     if (yE > v.pTop + 6 && yE < v.pTop + v.priceH - 6) {
-      ctx.fillStyle = col; ctx.fillText((isHigh ? "压轨 " : "撑轨 ") + pe.toFixed(dec()), right2 + 2, yE);
-    }
-    // 触轨提醒: 现价贴轨0.3%内 → ks-0906-9回测证伪"触撑即买"(全周期胜率36-48%均值负), 撑轨只给中性观察, 压轨保留S(触压回调仍偏有效)
-    if (pc2 != null && pv > 0 && Math.abs(pc2 / pv - 1) < 0.003) {
-      ctx.font = "bold 10px -apple-system, sans-serif"; ctx.textAlign = "right";
-      ctx.fillStyle = isHigh ? "#ff8a80" : "rgba(141,163,152,0.9)";
-      ctx.fillText(isHigh ? "触压轨·S" : "触撑·观察", right2 - 4, v.Y(pv) + (isHigh ? -8 : 11));
+      ctx.font = (touching ? "bold 10px" : "9.5px") + " -apple-system, sans-serif";
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillStyle = touching ? (isHigh ? "#ff8a80" : "rgba(141,163,152,0.9)") : col;
+      ctx.fillText((touching ? (isHigh ? "触压轨·S " : "触撑·观察 ") : (isHigh ? "压轨 " : "撑轨 ")) + pe.toFixed(dec()), right2 - 4, yE + (isHigh ? -8 : 11));
     }
     // 破轨提醒: 最近3根收盘穿越轨道 → ks-0906-9回测分级: 15分及以上给强指令(破压强势80%涨/破撑83%续跌), 1/5分噪音大只标中性破位
     for (var jb = Math.max(b2 + 1, n - 3); jb < n; jb++) {
@@ -2511,15 +2543,13 @@ function renderDailyLevels(ctx, v) {
   var d2 = dec();
   var pre = byWeek ? "上周" : (S.klt === "102" ? "上周" : "昨");
   var pre2 = byWeek ? "本周" : (S.klt === "102" ? "本周" : "今");
-  // 先画线、收集标签，再统一防重叠放置（上下最小间隔 13px）
-  var labels = [];
+  // 先画线（标签不再走文字列表，改右缘蜡烛式轴标，见下方）
   function lv(p, col, dash, lbl, lw) {
     var y = v.Y(p);
     if (y < v.pTop - 2 || y > v.pTop + v.priceH + 2) return;
     ctx.strokeStyle = col; ctx.lineWidth = lw || 1; ctx.setLineDash(dash);
     ctx.beginPath(); ctx.moveTo(v.padL, y); ctx.lineTo(right, y); ctx.stroke();
     ctx.setLineDash([]);
-    labels.push({ y: y, t: lbl + " " + p.toFixed(d2), c: col });
   }
   if (showPrev) {
     lv(prev.hi, "#ffb14d", S.ind.solid ? [] : [5, 4], pre + "高", 0.85);
@@ -2531,18 +2561,37 @@ function renderDailyLevels(ctx, v) {
     lv(today.lo, "#57a7ff", [], pre2 + "低", 1.15);
     lv(today.c, "#e8f2ea", [], "最新", 1.05);
   }
-  labels.sort(function (a, b) { return a.y - b.y; });
-  for (var li3 = 1; li3 < labels.length; li3++) {
-    if (labels[li3].y < labels[li3 - 1].y + 13) labels[li3].y = labels[li3 - 1].y + 13;
+  // ks-0906-20b: LuxAlgo 蜡烛式轴标——昨/今两根迷你蜡烛画进右缘价格轴沟槽(影线+实体+高低价签),
+  // 最新价用 TV 式实心标签压轴, 不再一排文字压住最新K线
+  function miniCandle(gx, d, tag) {
+    var yH = v.Y(d.hi), yL = v.Y(d.lo), yO = v.Y(d.o), yC = v.Y(d.c);
+    if (yL < v.pTop - 8 || yH > v.pTop + v.priceH + 8) return;
+    yH = Math.max(v.pTop + 6, yH); yL = Math.min(v.pTop + v.priceH - 6, yL);
+    yO = Math.max(yH, Math.min(yL, yO)); yC = Math.max(yH, Math.min(yL, yC));
+    var upC = d.c >= d.o, cc = upC ? UP : DN;
+    ctx.strokeStyle = cc; ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(gx, yH); ctx.lineTo(gx, yL); ctx.stroke();
+    ctx.fillStyle = cc;
+    ctx.fillRect(gx - 3, Math.min(yO, yC), 6, Math.max(2, Math.abs(yC - yO)));
+    ctx.font = "7px Menlo, monospace"; ctx.textAlign = "center";
+    ctx.fillStyle = "#d5e0d8"; ctx.textBaseline = "bottom";
+    ctx.fillText(d.hi.toFixed(d2), gx, yH - 2);
+    ctx.textBaseline = "top";
+    ctx.fillText(d.lo.toFixed(d2), gx, yL + 2);
+    ctx.fillStyle = "rgba(141,163,152,0.85)"; ctx.font = "7px -apple-system, sans-serif";
+    ctx.fillText(tag, gx, Math.min(yL + 11, v.pTop + v.priceH - 2));
   }
-  ctx.font = "9px Menlo, monospace"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
-  labels.forEach(function (L2) {
-    var tw3 = ctx.measureText(L2.t).width;
-    ctx.fillStyle = "rgba(10,14,11,0.85)";
-    ctx.fillRect(right - 3 - tw3 - 6, L2.y - 12, tw3 + 6, 12);
-    ctx.fillStyle = L2.c;
-    ctx.fillText(L2.t, right - 3, L2.y - 1);
-  });
+  if (showPrev) miniCandle(right + 11, prev, pre);
+  if (showToday) miniCandle(right + 33, today, pre2);
+  if (showToday && today.c != null) { // TV式最新价实心标签, 画最后压顶层
+    var yc9 = Math.max(v.pTop + 7, Math.min(v.pTop + v.priceH - 7, v.Y(today.c)));
+    var upC9 = today.c >= today.o;
+    ctx.fillStyle = upC9 ? UP : DN;
+    ctx.fillRect(right + 1, yc9 - 6, v.w - right - 2, 12);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 8px Menlo, monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(today.c.toFixed(d2), right + 1 + (v.w - right - 2) / 2, yc9);
+  }
   // LuxAlgo 风格：把上一周期的整根蜡烛画在图表左缘（影线+实体），一眼看上个日/周的范围和方向
   if (showPrev) {
     var gx = v.padL + 16, gw2 = 5;
@@ -2735,6 +2784,39 @@ function renderLuxSR(ctx, v, kl, i0, i1) {
   });
 }
 
+/* ---- ks-0906-20d: 量分布(Volume Profile) —— 可视区分24档, 右缘横向条: 红=阳线量(买) 绿=阴线量(卖), 右下角Δ净买; 量堆在哪=筹码/撑压在哪 ---- */
+function renderVP(ctx, v) {
+  if (!S.ind.vp || S.kl.length < 5 || !v.priceH) return;
+  var right = v.padL + (v.i1 - v.i0) * v.step;
+  var rows = 24, sp = (v.hi - v.lo) || 1;
+  var bU = new Array(rows).fill(0), bD = new Array(rows).fill(0);
+  var vmax = 0, i;
+  for (i = Math.max(1, v.i0); i < v.i1; i++) {
+    var k = S.kl[i], vol = k[5] || 0; if (!vol) continue;
+    var tp = (k[2] + k[3] + k[4]) / 3;
+    var r = Math.min(rows - 1, Math.max(0, Math.floor((tp - v.lo) / sp * rows)));
+    if (k[4] >= k[1]) bU[r] += vol; else bD[r] += vol;
+    if (bU[r] + bD[r] > vmax) vmax = bU[r] + bD[r];
+  }
+  if (!vmax) return;
+  var maxW = (right - v.padL) * 0.30, yH = v.priceH / rows;
+  for (i = 0; i < rows; i++) {
+    if (!bU[i] && !bD[i]) continue;
+    var y0 = v.pTop + v.priceH - (i + 1) * yH;
+    var wU = bU[i] / vmax * maxW, wD = bD[i] / vmax * maxW;
+    ctx.fillStyle = "rgba(53,217,154,0.30)"; ctx.fillRect(right - wU - wD, y0 + 0.5, wD, Math.max(1, yH - 1));
+    ctx.fillStyle = "rgba(255,111,102,0.30)"; ctx.fillRect(right - wU, y0 + 0.5, wU, Math.max(1, yH - 1));
+  }
+  var sU = 0, sD = 0;
+  for (i = 0; i < rows; i++) { sU += bU[i]; sD += bD[i]; }
+  var net = sU - sD, w2 = Math.abs(net) / 1e4;
+  var t9 = (net >= 0 ? "Δ+" : "Δ-") + (w2 >= 10000 ? (w2 / 10000).toFixed(2) + "亿" : Math.round(w2) + "万");
+  ctx.font = "bold 9px Menlo, monospace"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+  ctx.fillStyle = "rgba(8,12,10,0.6)"; var tw9 = ctx.measureText(t9).width;
+  ctx.fillRect(right - tw9 - 8, v.pTop + v.priceH - 12, tw9 + 6, 11);
+  ctx.fillStyle = net >= 0 ? "rgba(255,111,102,0.95)" : "rgba(53,217,154,0.95)";
+  ctx.fillText(t9, right - 4, v.pTop + v.priceH - 2);
+}
 /* ================= 强弱T面板（v2 区间位置版） =================
    pos=(收盘-近N根最低)/(近N根最高-最低)*100 —— 价格本身就是标尺: 创区间新高=100贴红线,
    创区间新低=0贴绿线, 与主图高低点严格一一对应, 没有均线滞后。
@@ -2771,7 +2853,7 @@ function renderTqs(ctx, v) {
   ctx.strokeStyle = "rgba(255,111,102,0.65)"; ctx.beginPath(); ctx.moveTo(v.padL, PY(80)); ctx.lineTo(right, PY(80)); ctx.stroke();
   ctx.strokeStyle = "rgba(53,217,154,0.65)"; ctx.beginPath(); ctx.moveTo(v.padL, PY(20)); ctx.lineTo(right, PY(20)); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.strokeStyle = "rgba(150,180,166,0.3)"; ctx.beginPath(); ctx.moveTo(v.padL, PY(50)); ctx.lineTo(right, PY(50)); ctx.stroke();
+  ctx.strokeStyle = "rgba(235,242,237,0.6)"; ctx.beginPath(); ctx.moveTo(v.padL, PY(50)); ctx.lineTo(right, PY(50)); ctx.stroke(); // ks-0906-20d: 中线灰→白
   // 位置折线(金) + 出界点染色(红=贴上轨高位 / 绿=贴下轨低位)
   ctx.lineWidth = 1.3;
   for (var i = Math.max(v.i0, 1); i < v.i1; i++) { // 分段染色: 高位段红/低位段绿/中间金, 一眼看出在哪区
@@ -2781,9 +2863,11 @@ function renderTqs(ctx, v) {
   }
   for (i = Math.max(v.i0, 1); i < v.i1; i++) {
     var p0 = P2[i];
-    if (p0 >= 80 || p0 <= 20) {
-      ctx.fillStyle = p0 >= 80 ? "#ff6f66" : "#35d99a";
-      ctx.beginPath(); ctx.arc(v.X(i), PY(p0), 1.6, 0, 7); ctx.fill();
+    if (p0 >= 80 || p0 <= 20) { // ks-0906-20d: 高/低位点改成带白芯描边的大圆点(TV式), 红=高位回调警戒 绿=低位, 不再是一点看不见的小点
+      var dx2 = v.X(i), dy2 = PY(p0), dc = p0 >= 80 ? "#ff6f66" : "#35d99a";
+      ctx.fillStyle = dc; ctx.beginPath(); ctx.arc(dx2, dy2, 3.2, 0, 7); ctx.fill();
+      ctx.strokeStyle = "rgba(8,12,10,0.9)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(dx2, dy2, 1.1, 0, 7); ctx.fill();
     }
     if ((p0 >= 80 && P2[i - 1] < 80) || (p0 <= 20 && P2[i - 1] > 20)) { // ★=刚进入高/低位区, 旁边标对应高/低点价
       var hiZ = p0 >= 80;
@@ -3211,7 +3295,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["ctrl", "控盘度"], ["solid", "实线"], ["volMain", "VOL叠加"], ["paneTop", "副图上置"]];
+var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["rtflow", "实时主力"], ["zlyy", "主力净额"], ["ctrl", "控盘度"], ["vp", "量分布"], ["solid", "实线"], ["volMain", "VOL叠加"], ["paneTop", "副图上置"]];
 /* ---- ★收藏栏(ks-0906-16): 点「＋挑收藏」进入挑选模式, 点工具/指标按钮上的☆即入栏; 取消收藏只从栏里消失,功能本身不关; 栏头可收起 ---- */
 function favName(id) {
   var p2 = id.split(":"), kd = p2[0], ky = p2[1];
@@ -3372,6 +3456,7 @@ function applyUrl() {
       S.ind.atri = true; // ks-0906-7: 内嵌图也要实时撑压轨+趋势线(用户指定)
       S.ind.tdhl = true;
       S.ind.tqs = true; // 强弱T默认直显(用户指定)
+      S.ind.ctrl = true; // ks-0906-20: 主力控盘直接在内嵌图显示(用户指定, MACD在内嵌默认关)
       S.ind.cost = true; // 成本线保留(用户核心关注)
       S.lineMode = true;
       S.toolsOff = true; // simple模式: 画线/指标行收进工具▾(点一下展开),图占满;不污染主站偏好
