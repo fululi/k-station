@@ -138,8 +138,7 @@
 <div class="tpan" data-page-node-id="dKei7X02s66kfDU8hLChRw"><button type="button" onclick="panTime(-1)" title="早前" data-page-node-id="soce9cG5d6g4qGXYe79Hch">◀</button><button type="button" onclick="panTime(1)" title="往后" data-page-node-id="rSyCfM0fi4YypF3jRIhJaA">▶</button></div>
 <div class="lgpop" data-lgpop>
   <div class="hd">图例 · 点?关闭</div>
-  <b class="r">派</b>主力出散户接(K线顶) · <b class="r">恐</b>恐慌日大跌(K线底)<br>
-  <b class="g">吸</b>主力进散户出(K线底) · <b class="o">洗</b>主力进但收跌(K线底)<br>
+  <b class="g">吸</b>主力进散户出·只在60日区间下半部盖(回测唯一正超额) · 派/恐/洗已回测证伪下线<br>
   <b class="y">★</b>冲进高位区≥80(过热) · <b class="g">★</b>跌进低位区≤20(超卖) · ●连排=单边延续<br>
   <b class="r">▼破撑</b>收盘破支撑 · <b class="g">▲破压</b>收盘破压力(15分+有效)<br>
   控盘柱=筹码集中度(红>100 橙50+ 黄<50) · 触撑=贴上未破只观察<br>
@@ -1269,7 +1268,7 @@ function draw() {
   renderAutoTri(ctx, v);
   renderDailyLevels(ctx, v);
   renderCostLine(ctx, v);
-  renderFundStamps(ctx, v); // ks-0906-23: 派/恐/吸/洗单字戳(与监测面板同口径)
+  renderFundStamps(ctx, v); // ks-0906-27: 只留低位"吸"单字戳(回测唯一正超额)
   renderMonitor(ctx, v);
   renderDrawings(ctx, v);
   renderBSMeasure(ctx, v); // ks-0906-8: B1→S1 测幅箭头(差几元/几点直接标图上)
@@ -3191,7 +3190,8 @@ function renderMonitor(ctx, v) {
     });
     if (parts.length) rows.push(["多周期三角 " + parts.join(" ") + ((upN + dnN) ? " · " + (upN + dnN) + "周期已突破" : " · 预判等方向"), upN ? UP : (dnN ? DN : "#b78cff")]);
   }
-  // 8. 资金结构告警(ks-0906-12 回测口径): 主力出+散户大接=派发(反抽减仓) / 主力进+散户出=强势(当天进场结构) / 恐慌日散户必接(123/123)
+  // 8. 资金结构告警(ks-0906-27 新回测口径): 只陈列事实+位置, 不给操作指令
+  // (旧话术"派发=反抽减仓"回测证伪: 派后10日两票照涨; "强势"也要分位置——低位才是真超额, 高位=对倒风险)
   if (S.fflow && S.fflow.length >= 21) {
     var fL = S.fflow[S.fflow.length - 1];
     if (fL && fL.small != null && isFinite(fL.small)) {
@@ -3202,12 +3202,15 @@ function renderMonitor(ctx, v) {
       var q60 = absM[Math.floor(absM.length * 0.6)] || 0;
       var wM = Math.round(fL.main / 1e4), wS = Math.round(fL.small / 1e4);
       var extreme = Math.abs(fL.main) > q60;
+      var hi8 = -1e18, lo8 = 1e18, kl8 = S.kl;
+      for (var j8 = Math.max(0, kl8.length - 60); j8 < kl8.length; j8++) { if (kl8[j8][2] > hi8) hi8 = kl8[j8][2]; if (kl8[j8][3] < lo8) lo8 = kl8[j8][3]; }
+      var posTag = (hi8 > lo8 && kl8.length && (kl8[kl8.length - 1][4] - lo8) / (hi8 - lo8) < 0.5) ? "低位" : "高位";
       if (fL.main < 0 && fL.small > 0 && extreme) {
         total++;
-        rows.push(["⚠ 派发结构 " + fL.d.slice(5) + "：主力出" + Math.abs(wM) + "万+散户接" + wS + "万 · 反抽减仓别加仓", "#ff8a80"]);
+        rows.push(["⚠ 派发结构 " + fL.d.slice(5) + "：主力出" + Math.abs(wM) + "万+散户接" + wS + "万 · 回测无预测力,只陈列事实", "#ff8a80"]);
       } else if (fL.main > 0 && fL.small < 0 && extreme) {
         total++; score++;
-        rows.push(["◆ 强势结构 " + fL.d.slice(5) + "：主力进" + wM + "万+散户出" + Math.abs(wS) + "万 · 当天进场结构(追高仍谨慎)", "#4fd79b"]);
+        rows.push(["◆ 强势结构 " + fL.d.slice(5) + "：主力进" + wM + "万+散户出" + Math.abs(wS) + "万 · " + posTag + (posTag === "低位" ? "(回测唯一正超额)" : "(对倒风险别追)"), "#4fd79b"]);
       } else {
         rows.push(["资金结构 " + fL.d.slice(5) + "：主力" + (wM >= 0 ? "+" : "") + wM + "万 / 散户" + (wS >= 0 ? "+" : "") + wS + "万 · 无极端", DIM]);
       }
@@ -3326,35 +3329,43 @@ function renderCtrl(ctx, v) {
     ctx.fillText(lv + " " + Math.round(cur), right - 4, y2 + 9);
   }
   // ks-0906-24: 进/出场三角删除——回测证伪(出场后10日基准+0.5%/持仓A +9.4%/持仓B +4.5%, 信号负价值);
-  // 标记只留主图"派/恐/吸/洗"四戳一套语言, 不再三套体系散落三个面板
+  // ks-0906-27: 四戳也回测, 只留低位"吸"一戳(详见 renderFundStamps 头注)
 }
-/* ================= 资金结构单字戳(ks-0906-23): 派/恐/吸/洗, 日K专用, 与监测面板同口径(|主力|>近60日60分位才算极端) =================
-   派(顶·浅红)=主力出+散户接 · 恐(底·红)=同上且当日跌>3% · 吸(底·绿)=主力进+散户出 · 洗(底·橙)=主力进+散户出但当日收跌 */
+/* ================= 资金结构单字戳(ks-0906-27): 只留"吸" =================
+   ks-0906-27 回测(stamp_bt.html · 3持仓×120日·东财资金流)结论:
+   · 吸=唯一有正超额的戳, 且必须低位才灵: 60日区间下半部+3日去重后 10日 +17.2%/+11.5%/+9.6%(三票)
+   · 派=反指(派后10日 -0.8%/+8.2%/+5.2%, 两票照涨) → 删除
+   · 恐=恐慌后多反弹, 语义误导 → 删除 · 洗=120日样本零触发, 死代码 → 删除
+   口径: |主力|>截至当日近60日|主力|的60分位; 吸=主力进+散户出+当日不跌+收盘在60日区间下半部; 同戳3日内不重复 */
 function renderFundStamps(ctx, v) {
   if (S.klt !== "101" || !S.fflow || !S.fflow.length || noFund(S.active)) return;
-  var kl = S.kl, fm = {};
-  S.fflow.forEach(function (r) { fm[r.d] = r; });
-  var absM = [], lb = Math.min(60, S.fflow.length - 1);
-  for (var fi = S.fflow.length - 1 - lb; fi < S.fflow.length - 1; fi++) absM.push(Math.abs(S.fflow[fi].main));
-  absM.sort(function (a, b) { return a - b; });
-  var q60 = absM[Math.floor(absM.length * 0.6)] || 0;
+  var kl = S.kl, fm = {}, fflow = S.fflow;
+  fflow.forEach(function (r, idx) { fm[r.d] = idx; });
   ctx.font = "bold 7px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  var lastXi = -99;
   for (var i = Math.max(v.i0, 1); i < v.i1; i++) {
-    var r = fm[kl[i][0]];
-    if (!r || r.small == null || !isFinite(r.small)) continue;
+    var fi = fm[kl[i][0]];
+    if (fi == null) continue;
+    var r = fflow[fi];
+    if (r.small == null || !isFinite(r.small)) continue;
+    var ws = [];
+    for (var k = Math.max(0, fi - 60); k < fi; k++) ws.push(Math.abs(fflow[k].main));
+    if (!ws.length) continue;
+    ws.sort(function (a, b) { return a - b; });
+    var q60 = ws[Math.floor(ws.length * 0.6)] || 0;
     if (Math.abs(r.main) <= q60) continue;
     var pct = kl[i - 1][4] ? (kl[i][4] / kl[i - 1][4] - 1) * 100 : 0;
-    var ch = null, col = null, top = false;
-    if (r.main < 0 && r.small > 0) {
-      if (pct <= -3) { ch = "恐"; col = "#ff5252"; } else { ch = "派"; col = "#ff8a80"; top = true; }
-    } else if (r.main > 0 && r.small < 0) {
-      if (pct < 0) { ch = "洗"; col = "#ff9a5c"; } else { ch = "吸"; col = "#35d99a"; }
-    }
-    if (!ch) continue;
-    var x = v.X(i), y = top ? v.Y(kl[i][2]) - 8 : v.Y(kl[i][3]) + 8;
-    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 4.6, 0, 7); ctx.fill();
+    if (!(r.main > 0 && r.small < 0 && pct >= 0)) continue; // 只剩"吸"的触发条件
+    var hi = -1e18, lo = 1e18;
+    for (var j = Math.max(0, i - 59); j <= i; j++) { if (kl[j][2] > hi) hi = kl[j][2]; if (kl[j][3] < lo) lo = kl[j][3]; }
+    var pos = hi > lo ? (kl[i][4] - lo) / (hi - lo) : 0.5;
+    if (pos >= 0.5) continue; // 高位不盖"吸"(山顶吸是回测头号反指)
+    if (i - lastXi < 3) continue; // 3日去重
+    lastXi = i;
+    var x = v.X(i), y = v.Y(kl[i][3]) + 8;
+    ctx.fillStyle = "#35d99a"; ctx.beginPath(); ctx.arc(x, y, 4.6, 0, 7); ctx.fill();
     ctx.strokeStyle = "rgba(8,12,10,0.85)"; ctx.lineWidth = 0.8; ctx.stroke();
-    ctx.fillStyle = "#0a0e0b"; ctx.fillText(ch, x, y + 0.5);
+    ctx.fillStyle = "#0a0e0b"; ctx.fillText("吸", x, y + 0.5);
   }
 }
 /* ================= 主力净额副图（东财日级真实口径：超大单+大单净额，一条线看方向） ================= */
