@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-06 控盘面板更名主力控盘(数据=量价控盘度已核对)">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-13 主力控盘叠DDX60金线(60日主力净额/成交额): 回测控盘≥50+金线上行后10日+6.8%/57% vs 下行+0.9%/48%, 金线方向=柱子真假验证, 只陈列不加标识">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -143,7 +143,7 @@
 <div class="lgpop" data-lgpop>
   <div class="hd">图例 · 点?关闭</div>
   <b class="g">吸</b>主力进散户出·只在60日区间下半部盖(回测唯一正超额) · 派/恐/洗已回测证伪下线<br>
-  控盘柱=量价控盘度: <b class="r">红</b>高控盘≥100 <b class="o">橙</b>中≥50 <b class="y">黄</b>低 · 柱高=力度, 时机看强弱T<br>
+  主力控盘: <b class="r">红</b>≥100 <b class="o">橙</b>≥50 <b class="y">黄</b>低(量价) · <b class="y">金线</b>DDX60真钱控盘,上行才信柱(回测+6.8% vs +0.9%)<br>
   <b class="y">★</b>冲进高位区≥80(过热) · <b class="g">★</b>跌进低位区≤20(超卖) · ●连排=单边延续<br>
   <b class="r">▼破撑</b>收盘破支撑 · <b class="g">▲破压</b>收盘破压力(15分+有效) · 触撑=贴上未破只观察<br>
   <b class="y">▲B/▼S</b>你的买卖画线 · <b class="o">⚠1.618</b>扩展到位别追
@@ -3370,6 +3370,45 @@ function renderCtrl(ctx, v) {
     ctx.font = "bold 9.5px Menlo, monospace"; ctx.textAlign = "right";
     ctx.fillStyle = lc;
     ctx.fillText(lv + " " + Math.round(cur), right - 4, y2 + 9);
+  }
+  // ks-0907-13: DDX60金线(真钱: 近60日主力净额累计/成交额×100)叠在控盘柱上, 只陈列不加标识
+  // 回测(4票×180日·新浪资金流): 控盘≥50+金线5日上行 后10日+6.8%/胜率57% vs 金线下行 +0.9%/48% → 金线方向=柱子真假的验证器
+  if (S.fflow && S.fflow.length >= 65 && !noFund(S.active)) {
+    var fm2 = {}, ff2 = S.fflow;
+    ff2.forEach(function (r) { fm2[r.d] = parseFloat(r.main) || 0; });
+    var ddx = new Array(n).fill(null);
+    for (i2 = 59; i2 < n; i2++) {
+      var ms = 0, as = 0, ok2 = true;
+      for (var j2 = i2 - 59; j2 <= i2; j2++) {
+        var mv2 = fm2[kl[j2][0]];
+        if (mv2 == null) { ok2 = false; break; }
+        ms += mv2; as += kl[j2][5] * 100 * kl[j2][4];
+      }
+      if (ok2 && as > 0) ddx[i2] = ms / as * 100;
+    }
+    var dLo = 1e18, dHi = -1e18;
+    for (i2 = Math.max(59, v.i0); i2 < v.i1; i2++) { if (ddx[i2] != null) { if (ddx[i2] < dLo) dLo = ddx[i2]; if (ddx[i2] > dHi) dHi = ddx[i2]; } }
+    if (dHi > -1e17 && dHi > dLo) {
+      var DY = function (x) { return base - (x - dLo) / (dHi - dLo) * (h2 - 16); };
+      ctx.strokeStyle = "#ffd21f"; ctx.lineWidth = 1.2;
+      ctx.beginPath(); var st2 = false;
+      for (i2 = Math.max(59, v.i0); i2 < v.i1; i2++) {
+        if (ddx[i2] == null) continue;
+        var px = v.X(i2), py = DY(ddx[i2]);
+        if (!st2) { ctx.moveTo(px, py); st2 = true; } else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      var di = -1;
+      for (i2 = Math.min(n - 1, v.i1 - 1); i2 >= Math.max(59, v.i0); i2--) if (ddx[i2] != null) { di = i2; break; }
+      if (di >= 0) {
+        var d5 = null;
+        for (var j3 = di - 5; j3 >= Math.max(59, v.i0); j3--) if (ddx[j3] != null) { d5 = ddx[j3]; break; }
+        var dir = d5 != null ? (ddx[di] > d5 ? "↑" : "↓") : "";
+        ctx.font = "bold 8px Menlo, monospace"; ctx.textAlign = "left";
+        ctx.fillStyle = "#ffd21f";
+        ctx.fillText("DDX" + (ddx[di] >= 0 ? "+" : "") + ddx[di].toFixed(1) + dir, v.padL + 52, y2 + 9);
+      }
+    }
   }
   // ks-0907-05: 进出场三角全删(用户定:标了对不上=不该标), 面板只留柱子本身, 时机看强弱T
 }
