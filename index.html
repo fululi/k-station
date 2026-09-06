@@ -110,6 +110,10 @@
   }
   .lnkb { font-size: 10px; color: #8fa398; white-space: nowrap; }
   body.embed [data-name], body.embed [data-px], body.embed [data-pct], body.embed [data-lnk], body.embed [data-shot] { display: none; }
+  /* ks-0907-01: 内嵌图顶栏+工具行全收(用户指定: 上面全隐藏图撑大), 浮动☰可唤回 */
+  body.embed .topbar, body.embed .row { display: none; }
+  body.embed.showbars .topbar, body.embed.showbars .row { display: flex; }
+  body.embed.showbars .row[data-tabs] { display: none; } /* 内嵌单票: 股票切换行仍没意义 */
   /* ks-0906-22: 主题三态挂html根元素(body背景会穿透到页面画布层,filter管不着=字变板不变的根因); invert(1)全量反色不灰蒙蒙, hue-rotate(180)保红涨绿跌; 纯黑(默认)/外黑内白(只反画布)/纯白(整页反色) */
   html.theme-lc [data-chart] { filter: invert(1) hue-rotate(180deg); }
   html.theme-la { filter: invert(1) hue-rotate(180deg); }
@@ -3538,7 +3542,21 @@ function buildInds() {
 function applyUrl() {
   try {
     var q = new URLSearchParams(location.search);
-    if (q.get("embed") === "1") document.body.classList.add("embed"); // hq内嵌: 隐藏票头, hq卡片已有同名同价
+    if (q.get("embed") === "1") {
+      document.body.classList.add("embed"); // hq内嵌: 隐藏票头, hq卡片已有同名同价
+      // ks-0907-01: 内嵌顶栏/工具行全收(图撑大), 浮动☰唤回/收起
+      if (!document.getElementById("barsFab")) {
+        var bf = document.createElement("button");
+        bf.id = "barsFab"; bf.type = "button";
+        bf.style.cssText = "position:fixed;right:10px;bottom:134px;z-index:60;width:34px;height:34px;border-radius:17px;border:1px solid #2a3240;background:rgba(22,27,36,.85);color:#9fb3a6;font-size:15px;opacity:.85;padding:0";
+        bf.textContent = "☰";
+        bf.addEventListener("click", function () {
+          document.body.classList.toggle("showbars");
+          draw();
+        });
+        document.body.appendChild(bf);
+      }
+    }
     var code = q.get("code");
     if (code) {
       code = code.trim();
