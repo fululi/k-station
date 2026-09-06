@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-24 控盘进出场三角删除(回测证伪)+标记只留主图四戳一套语言+图例同步">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-25 腾讯K线三通道容灾(web.ifzq抽风自动切proxy.finance.qq.com镜像,同一份数据)">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -184,6 +184,22 @@ function fetchJSON(url, cb) {
     if (!done) { done = true; clearTimeout(to); cb(null, d); }
   }).catch(function (e) { if (!done) { done = true; clearTimeout(to); cb(e); } });
 }
+// ks-0906-25: 腾讯K线三通道容灾 —— web.ifzq/ifzq 单通道抽风时自动切 proxy.finance.qq.com(腾讯官方镜像,同一份数据), 与hq-mobile v5.120同款; 通道连通性随用户网络翻转, 单通道重试无意义
+var TXK_BASES = ["https://web.ifzq.gtimg.cn", "https://ifzq.gtimg.cn", "https://proxy.finance.qq.com/ifzqgtimg"];
+var txkBi = 0;
+function fetchJSONK(path, cb) {
+  var n = 0;
+  function attempt() {
+    var bi = (txkBi + n) % TXK_BASES.length;
+    fetchJSON(TXK_BASES[bi] + path, function (err, d) {
+      if (!err && d) { txkBi = bi; cb(null, d); return; }
+      n++;
+      if (n < TXK_BASES.length * 2) { attempt(); return; }
+      cb(err || new Error("腾讯三通道全失败"));
+    });
+  }
+  attempt();
+}
 // 腾讯格式 [日期,开,收,高,低,量]（分钟线日期为 yyyyMMddHHmm）→ 统一 [date, o, h, l, c, v]
 function txRows(rows) {
   return rows.map(function (r) {
@@ -199,14 +215,14 @@ function fetchKlineTX(code, klt, cb) {
   if (klt === "101" || klt === "102" || klt === "103") {
     var per = klt === "101" ? "day" : (klt === "102" ? "week" : "month");
     var api2 = isUS(code) ? "usfqkline" : "fqkline";
-    fetchJSON("https://web.ifzq.gtimg.cn/appstock/app/" + api2 + "/get?param=" + prefix + "," + per + ",,,320,qfq", function (err, d) {
+    fetchJSONK("/appstock/app/" + api2 + "/get?param=" + prefix + "," + per + ",,,320,qfq", function (err, d) {
       var sd = d && d.data && d.data[prefix];
       var rows = sd && (sd["qfq" + per] || sd[per]);
       if (err || !rows || !rows.length) { cb(err || new Error("腾讯无K线")); return; }
       cb(null, txRows(rows), "");
     });
   } else {
-    fetchJSON("https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=" + prefix + ",m" + kA + ",,320", function (err, d) {
+    fetchJSONK("/appstock/app/kline/mkline?param=" + prefix + ",m" + kA + ",,320", function (err, d) {
       var sd = d && d.data && d.data[prefix];
       var rows = sd && sd["m" + kA];
       if (err || !rows || !rows.length) { cb(err || new Error("腾讯无分钟K线")); return; }
