@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-20 主题三态+B/S档位三角化+LuxAlgo蜡烛轴标+Fib去红配色+强弱T白中线大圆点+量分布剖面">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-21 监测新增1.618触位告警(回测:永鼎90%巨石85%触后回调)+0906-20全套">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -3068,6 +3068,32 @@ function renderMonitor(ctx, v) {
   } else {
     rows.push(["主力 · 非交易时段/加载中", "#8fa398"]);
   }
+  // 3c. 1.618扩展位触位告警(ks-0906-21): 用户手绘4张Fib全部到1.618附近回调 → 回测证实(永鼎90%/巨石85%/通信ETF 66% 触后10日内回撤≥4%, 永鼎平均-15%) → 贴位给"别追·减仓参考", 附本股历史命中率
+  try {
+    var zz = [], zt = 0, zhi = kl[0][2], zhiI = 0, zlo = kl[0][3], zloI = 0;
+    for (var zi = 0; zi < n; zi++) {
+      var zk = kl[zi];
+      if (zk[2] > zhi) { zhi = zk[2]; zhiI = zi; }
+      if (zk[3] < zlo) { zlo = zk[3]; zloI = zi; }
+      if (zt >= 0 && zk[4] < zhi * 0.88) { zz.push([zhiI, zhi, 1]); zt = -1; zlo = zk[3]; zloI = zi; }
+      else if (zt <= 0 && zk[4] > zlo * 1.12) { zz.push([zloI, zlo, -1]); zt = 1; zhi = zk[2]; zhiI = zi; }
+    }
+    var legs9 = [];
+    for (zi = 0; zi < zz.length - 1; zi++) if (zz[zi][2] === -1 && zz[zi + 1][2] === 1 && zz[zi + 1][1] > zz[zi][1] * 1.1) legs9.push([zz[zi][0], zz[zi][1], zz[zi + 1][0], zz[zi + 1][1]]);
+    var touch9 = 0, pb9 = 0, lastLeg = legs9.length ? legs9[legs9.length - 1] : null;
+    for (var l9 = 0; l9 < legs9.length; l9++) {
+      var L9 = legs9[l9], ext9 = L9[1] + (L9[3] - L9[1]) * 1.618, hit9 = -1;
+      for (var j9 = L9[2] + 1; j9 < Math.min(n, L9[2] + 130); j9++) if (kl[j9][2] >= ext9) { hit9 = j9; break; }
+      if (hit9 > 0 && hit9 + 5 < n) { touch9++; var mn9 = 1e18; for (var m9 = hit9 + 1; m9 < Math.min(n, hit9 + 11); m9++) if (kl[m9][3] < mn9) mn9 = kl[m9][3]; if (mn9 <= kl[hit9][2] * 0.96) pb9++; }
+    }
+    if (lastLeg && n > 60) {
+      var extN = lastLeg[1] + (lastLeg[3] - lastLeg[1]) * 1.618;
+      var tch5 = false; for (var q9 = Math.max(0, n - 5); q9 < n; q9++) if (kl[q9][2] >= extN) tch5 = true;
+      if ((Math.abs(last / extN - 1) <= 0.02 || tch5) && last > extN * 0.94 && touch9 >= 2) {
+        rows.push(["⚠ 1.618到位 " + extN.toFixed(dec()) + " · 本股历史触后10日回调 " + pb9 + "/" + touch9 + " · 别追·减仓参考", "#ff8a80"]);
+      }
+    }
+  } catch (e9) {}
   // 4. MACD 多空 + 金叉死叉
   total++;
   var md2 = macdArr(kl);
