@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-04 控盘面板回老版量价控盘度(红橙黄柱+▲上穿50进场▼跌破50离场,与走势同源)+吸戳保留无过滤">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-05 控盘面板进出三角全删(用户定:对不上不标),只留红橙黄柱,时机看强弱T">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -143,7 +143,7 @@
 <div class="lgpop" data-lgpop>
   <div class="hd">图例 · 点?关闭</div>
   <b class="g">吸</b>主力进散户出·只在60日区间下半部盖(回测唯一正超额) · 派/恐/洗已回测证伪下线<br>
-  控盘柱=量价控盘度: <b class="r">红</b>高控盘≥100 <b class="o">橙</b>中≥50 <b class="y">黄</b>低 · 底<b class="g">▲</b>主力进场(上穿50) 顶<b class="r">▼</b>主力离场(跌破50)<br>
+  控盘柱=量价控盘度: <b class="r">红</b>高控盘≥100 <b class="o">橙</b>中≥50 <b class="y">黄</b>低 · 柱高=力度, 时机看强弱T<br>
   <b class="y">★</b>冲进高位区≥80(过热) · <b class="g">★</b>跌进低位区≤20(超卖) · ●连排=单边延续<br>
   <b class="r">▼破撑</b>收盘破支撑 · <b class="g">▲破压</b>收盘破压力(15分+有效) · 触撑=贴上未破只观察<br>
   <b class="y">▲B/▼S</b>你的买卖画线 · <b class="o">⚠1.618</b>扩展到位别追
@@ -3371,24 +3371,7 @@ function renderCtrl(ctx, v) {
     ctx.fillStyle = lc;
     ctx.fillText(lv + " " + Math.round(cur), right - 4, y2 + 9);
   }
-  // 主力进场/离场三角(同控盘柱序列, 与柱同源): 上穿50=底绿▲进场, 跌破50=顶红▼离场
-  var prev = null;
-  ctx.lineWidth = 0.8; ctx.strokeStyle = "rgba(8,12,10,0.85)";
-  for (i2 = 1; i2 < v.i1; i2++) {
-    var c2 = cs[i2];
-    if (c2 == null) continue;
-    if (prev != null && i2 >= v.i0) {
-      var x3 = v.X(i2);
-      if (c2 >= 50 && prev < 50) { // 进场 ▲ 尖头朝上, 蹲面板底
-        ctx.fillStyle = "#35d99a";
-        ctx.beginPath(); ctx.moveTo(x3, base - 8); ctx.lineTo(x3 - 3, base - 1); ctx.lineTo(x3 + 3, base - 1); ctx.closePath(); ctx.fill(); ctx.stroke();
-      } else if (c2 < 50 && prev >= 50) { // 离场 ▼ 尖头朝下, 贴面板顶
-        ctx.fillStyle = "#ff6f66";
-        ctx.beginPath(); ctx.moveTo(x3 - 3, y2 + 11); ctx.lineTo(x3 + 3, y2 + 11); ctx.lineTo(x3, y2 + 18); ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
-    }
-    prev = c2;
-  }
+  // ks-0907-05: 进出场三角全删(用户定:标了对不上=不该标), 面板只留柱子本身, 时机看强弱T
 }
 /* ================= 资金结构单字戳(ks-0906-27): 只留"吸" =================
    ks-0906-27 回测(stamp_bt.html · 3持仓×120日·东财资金流)结论:
