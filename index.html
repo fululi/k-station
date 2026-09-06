@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-05 控盘面板进出三角全删(用户定:对不上不标),只留红橙黄柱,时机看强弱T">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-06 控盘面板更名主力控盘(数据=量价控盘度已核对)">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -3339,7 +3339,7 @@ function renderCtrl(ctx, v) {
   ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   // ks-0907-04: 恢复老版量价控盘度(用户定稿): ctrlCalc通达信经典价位口径(35日区间位置平滑), 与价格走势同源=上下必然对得上
   // 柱从底部起高: ≥100红=高控盘 / 50~100橙=中控盘 / >0黄=低控盘; 底绿▲=主力进场(上穿50) 顶红▼=主力离场(跌破50)
-  ctx.fillText("控盘度", v.padL + 4, y2 + 9);
+  ctx.fillText("主力控盘", v.padL + 4, y2 + 9);
   var cs = ctrlCalc(kl);
   var cMax = 120, i2;
   for (i2 = v.i0; i2 < v.i1; i2++) if (cs[i2] != null && cs[i2] > cMax) cMax = cs[i2];
