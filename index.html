@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-25 腾讯K线三通道容灾(web.ifzq抽风自动切proxy.finance.qq.com镜像,同一份数据)">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-26 默认名单不硬编码(读同域名portfolio_v2,空壳防底牌外露)+ETF小数按代码段判">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -402,9 +402,21 @@ function fetchFFlowMin(code, cb) {
 var PERIODS = [["1", "1分"], ["5", "5分"], ["15", "15分"], ["30", "30分"], ["60", "60分"], ["101", "日线"], ["5D", "5日"], ["102", "周线"], ["103", "月线"]]; // 分钟在前,行窄可横滚
 var TOOLS = [["trend", "趋势线", 2], ["hline", "水平线", 1], ["ray", "射线", 2], ["rect", "矩形", 2], ["fib", "斐波那契", 2], ["pct", "测幅%", 2], ["tri", "三角形", 3], ["xabcd", "蝴蝶XABCD", 5], ["freedraw", "画笔", 2], ["lrchan", "画回归", 2], ["buy", "买点线", 1], ["priceline", "价线", 0]];
 var TICON = { trend: "╱", hline: "─", ray: "↗", rect: "▭", fib: "φ", pct: "⇅", tri: "△", xabcd: "✕", freedraw: "✎", lrchan: "∥", buy: "Ⓑ", priceline: "¥" }; // ks-0906-19: TV风图标按钮(名字在title/提示里)
+// ks-0906-26: 默认名单不再硬编码(公开仓库不挂用户底牌)——优先读同域名 hq-mobile 的 portfolio_v2 持仓, 读不到就空列表自己加
+var KS_SEED = (function () {
+  try {
+    var pf = JSON.parse(localStorage.getItem("portfolio_v2") || "null");
+    if (pf && pf.holds && pf.holds.length) {
+      var seen = {}, out = [];
+      pf.holds.forEach(function (h) { var c = String(h.code).replace(/^(sh|sz)/, ""); if (!seen[c]) { seen[c] = 1; out.push([c, h.name || c]); } });
+      if (out.length) return out;
+    }
+  } catch (e) {}
+  return [];
+})();
 var S = {
-  codes: [["600105", "永鼎股份"], ["600176", "中国巨石"], ["515880", "通信ETF"]],
-  active: "600105", klt: "101",
+  codes: KS_SEED,
+  active: KS_SEED.length ? KS_SEED[0][0] : "600519", klt: "101",
   kl: [], name: "", quote: null,
   end: 0, count: 0,
   tool: null, pending: [], selected: -1, cross: null, ghost: null,
@@ -460,7 +472,7 @@ var hintEl = document.querySelector("[data-hint]");
 var _hintT = null;
 function hint(t) { hintEl.innerHTML = t || ""; if (_hintT) clearTimeout(_hintT); if (t) _hintT = setTimeout(function () { hintEl.innerHTML = ""; }, 5000); } // ks-0906-15: 底部黄字提示5秒自动消失,不常驻占地方
 function cls(p) { return p == null || isNaN(p) ? "flat" : (p > 0 ? "up" : (p < 0 ? "down" : "flat")); }
-function dec() { var t = typeOf(S.active); return (t === "ETF" || t === "FJ" || S.active === "515880") ? 3 : 2; }
+function dec() { var t = typeOf(S.active); var b = S.active.replace(/^(sh|sz)/, ""); return (t === "ETF" || t === "FJ" || /^(51|15|16|58)/.test(b)) ? 3 : 2; } // ks-0906-26: ETF/基金按代码段判3位小数, 不再写死单一代码
 function fwp(v) { var d2 = dec(); return v == null || isNaN(v) ? "—" : v.toFixed(d2); }
 var UP = "#ff6f66", DN = "#35d99a", DIM = "#5d6f64", GRID = "rgba(38,51,44,0.32)", SEL = "#ffd21f";
 function maArr(kl, n) {
@@ -3109,7 +3121,7 @@ function renderMonitor(ctx, v) {
   } else {
     rows.push(["主力 · 非交易时段/加载中", "#8fa398"]);
   }
-  // 3c. 1.618扩展位触位告警(ks-0906-21): 用户手绘4张Fib全部到1.618附近回调 → 回测证实(永鼎90%/巨石85%/通信ETF 66% 触后10日内回撤≥4%, 永鼎平均-15%) → 贴位给"别追·减仓参考", 附本股历史命中率
+  // 3c. 1.618扩展位触位告警(ks-0906-21): 用户手绘4张Fib全部到1.618附近回调 → 回测证实(持仓A 90%/持仓B 85%/持仓ETF 66% 触后10日内回撤≥4%, 持仓A平均-15%) → 贴位给"别追·减仓参考", 附本股历史命中率
   try {
     var zz = [], zt = 0, zhi = kl[0][2], zhiI = 0, zlo = kl[0][3], zloI = 0;
     for (var zi = 0; zi < n; zi++) {
@@ -3183,7 +3195,7 @@ function renderMonitor(ctx, v) {
   if (S.fflow && S.fflow.length >= 21) {
     var fL = S.fflow[S.fflow.length - 1];
     if (fL && fL.small != null && isFinite(fL.small)) {
-      // 分位数自适应阈值: 近60日|主力|的60分位(q80对永鼎这类妖股太钝——它日常就亿级进出, 5亿流出居然只是"日常")
+      // 分位数自适应阈值: 近60日|主力|的60分位(q80对高波动妖股太钝——日常就亿级进出, 5亿流出居然只是"日常")
       var absM = [], lookback = Math.min(60, S.fflow.length - 1);
       for (var fi2 = S.fflow.length - 1 - lookback; fi2 < S.fflow.length - 1; fi2++) absM.push(Math.abs(S.fflow[fi2].main));
       absM.sort(function (a, b) { return a - b; });
@@ -3313,7 +3325,7 @@ function renderCtrl(ctx, v) {
     ctx.fillStyle = lc;
     ctx.fillText(lv + " " + Math.round(cur), right - 4, y2 + 9);
   }
-  // ks-0906-24: 进/出场三角删除——回测证伪(出场后10日上证+0.5%/永鼎+9.4%/巨石+4.5%, 信号负价值);
+  // ks-0906-24: 进/出场三角删除——回测证伪(出场后10日基准+0.5%/持仓A +9.4%/持仓B +4.5%, 信号负价值);
   // 标记只留主图"派/恐/吸/洗"四戳一套语言, 不再三套体系散落三个面板
 }
 /* ================= 资金结构单字戳(ks-0906-23): 派/恐/吸/洗, 日K专用, 与监测面板同口径(|主力|>近60日60分位才算极端) =================
@@ -3495,7 +3507,7 @@ function buildInds() {
   buildFavs(); // 收藏栏里的指标按钮同步亮灭
 }
 /* ================= 启动（放最后：确保所有函数/var 均已就绪） ================= */
-// hq-mobile 跳转参数：?code=600105&lines=44.2,41.5 （lines 在 K 线加载后落成水平线，同价位去重）
+// hq-mobile 跳转参数：?code=600519&lines=1700.5,1650.0 （lines 在 K 线加载后落成水平线，同价位去重）
 function applyUrl() {
   try {
     var q = new URLSearchParams(location.search);
