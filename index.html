@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-03 控盘面板恢复老柱风(真钱mcr10:红高橙中黄低绿流出)+进出场三角收回面板与柱同源+主图进出戳下线">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-04 控盘面板回老版量价控盘度(红橙黄柱+▲上穿50进场▼跌破50离场,与走势同源)+吸戳保留无过滤">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -142,8 +142,8 @@
 <div class="tpan" data-page-node-id="dKei7X02s66kfDU8hLChRw"><button type="button" onclick="panTime(-1)" title="早前" data-page-node-id="soce9cG5d6g4qGXYe79Hch">◀</button><button type="button" onclick="panTime(1)" title="往后" data-page-node-id="rSyCfM0fi4YypF3jRIhJaA">▶</button></div>
 <div class="lgpop" data-lgpop>
   <div class="hd">图例 · 点?关闭</div>
-  <b class="g">吸</b>主力进散户出·低位+控盘为正才盖(回测唯一正超额) · 派/恐/洗已回测证伪下线<br>
-  控盘柱=真钱(10日主力净占成交): <b class="r">红</b>高控盘 <b class="y">黄</b>低控盘 <b class="g">绿</b>流出 · 底<b class="g">▲</b>主力进场 顶<b class="r">▼</b>主力离场(与柱同源)<br>
+  <b class="g">吸</b>主力进散户出·只在60日区间下半部盖(回测唯一正超额) · 派/恐/洗已回测证伪下线<br>
+  控盘柱=量价控盘度: <b class="r">红</b>高控盘≥100 <b class="o">橙</b>中≥50 <b class="y">黄</b>低 · 底<b class="g">▲</b>主力进场(上穿50) 顶<b class="r">▼</b>主力离场(跌破50)<br>
   <b class="y">★</b>冲进高位区≥80(过热) · <b class="g">★</b>跌进低位区≤20(超卖) · ●连排=单边延续<br>
   <b class="r">▼破撑</b>收盘破支撑 · <b class="g">▲破压</b>收盘破压力(15分+有效) · 触撑=贴上未破只观察<br>
   <b class="y">▲B/▼S</b>你的买卖画线 · <b class="o">⚠1.618</b>扩展到位别追
@@ -3337,60 +3337,52 @@ function renderCtrl(ctx, v) {
   ctx.strokeStyle = GRID; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(v.padL, y2); ctx.lineTo(right, y2); ctx.stroke();
   ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-  // ks-0907-03: 视觉恢复老"控盘度"柱风(用户指定), 数据仍是真钱口径 mcr10(近10日主力净额/成交额×100)
-  // 柱从底部起高: ≥3红=高控盘 / 0~3黄=低控盘 / <0绿=流出; 底绿▲=主力进场(上穿3) 顶红▼=主力离场(下穿0), 与柱同源=永远对得上
-  // 回测(mctrl_bt·3票): 强控盘后10日 +24.1%/+16.6%/+9.5%(胜率89~100%), 进场交叉后10日三票全胜
+  // ks-0907-04: 恢复老版量价控盘度(用户定稿): ctrlCalc通达信经典价位口径(35日区间位置平滑), 与价格走势同源=上下必然对得上
+  // 柱从底部起高: ≥100红=高控盘 / 50~100橙=中控盘 / >0黄=低控盘; 底绿▲=主力进场(上穿50) 顶红▼=主力离场(跌破50)
   ctx.fillText("控盘度", v.padL + 4, y2 + 9);
-  if (!S.fflow || S.fflow.length < 11) {
-    ctx.fillStyle = S.fflowErr ? "#ff8a80" : DIM; ctx.font = "10px -apple-system, sans-serif";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(S.fflowErr ? "资金流限流/断线 · 点「刷新」重试" : "资金流数据加载中…", v.padL + (right - v.padL) / 2, y2 + h2 / 2);
-    ctx.textBaseline = "alphabetic";
-    return;
-  }
-  var mc = mcrSeries();
-  var cMax = 4, i2;
-  for (i2 = v.i0; i2 < v.i1; i2++) { var mv = mc[kl[i2][0]]; if (mv != null && Math.abs(mv) > cMax) cMax = Math.abs(mv); }
+  var cs = ctrlCalc(kl);
+  var cMax = 120, i2;
+  for (i2 = v.i0; i2 < v.i1; i2++) if (cs[i2] != null && cs[i2] > cMax) cMax = cs[i2];
   var base = y2 + h2 - 3;
   var ZY = function (val) { return base - val / cMax * (h2 - 16); };
-  // +3%高控盘虚线
-  if (cMax > 3.5) {
+  // 100高控盘虚线
+  if (cMax > 110) {
     ctx.strokeStyle = "rgba(255,111,102,0.35)"; ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(v.padL, ZY(3)); ctx.lineTo(right, ZY(3)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(v.padL, ZY(100)); ctx.lineTo(right, ZY(100)); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = "rgba(255,111,102,0.55)"; ctx.font = "8px Menlo, monospace"; ctx.textAlign = "right";
-    ctx.fillText("高控盘3%", right - 4, ZY(3) - 2);
+    ctx.fillText("高控盘100", right - 4, ZY(100) - 2);
   }
-  // 柱: ≥3红 / >0黄 / <0绿(流出), 通达信控盘度配色, 高矮=力度
+  // 柱: ≥100红 / 50~100橙 / >0黄 (通达信原版配色)
   var bw = Math.max(1, v.step * 0.55);
   for (i2 = v.i0; i2 < v.i1; i2++) {
-    var val = mc[kl[i2][0]];
-    if (val == null) continue;
-    ctx.fillStyle = val >= 3 ? "#ff6f66" : (val >= 0 ? "#e8c568" : "#35d99a");
-    var x2 = v.X(i2) - bw / 2, yt = ZY(Math.abs(val));
+    var val = cs[i2];
+    if (val == null || val <= 0) continue;
+    ctx.fillStyle = val >= 100 ? "#ff6f66" : (val >= 50 ? "#ff9a5c" : "#e8c568");
+    var x2 = v.X(i2) - bw / 2, yt = ZY(val);
     ctx.fillRect(x2, yt, bw, Math.max(1, base - yt));
   }
   // 右端读数 + 级别
   var cur = null;
-  for (i2 = Math.min(n - 1, v.i1 - 1); i2 >= v.i0; i2--) { var cv2 = mc[kl[i2][0]]; if (cv2 != null) { cur = cv2; break; } }
+  for (i2 = Math.min(n - 1, v.i1 - 1); i2 >= v.i0; i2--) { if (cs[i2] != null) { cur = cs[i2]; break; } }
   if (cur != null) {
-    var lv = cur >= 3 ? "高控盘" : (cur >= 0 ? "低控盘" : "流出");
-    var lc = cur >= 3 ? "#ff6f66" : (cur >= 0 ? "#e8c568" : "#35d99a");
+    var lv = cur >= 100 ? "高控盘" : (cur >= 50 ? "中控盘" : (cur > 0 ? "低控盘" : "无控盘"));
+    var lc = cur >= 100 ? "#ff6f66" : (cur >= 50 ? "#ff9a5c" : (cur > 0 ? "#e8c568" : DIM));
     ctx.font = "bold 9.5px Menlo, monospace"; ctx.textAlign = "right";
     ctx.fillStyle = lc;
-    ctx.fillText(lv + " " + (cur >= 0 ? "+" : "") + cur.toFixed(1) + "%", right - 4, y2 + 9);
+    ctx.fillText(lv + " " + Math.round(cur), right - 4, y2 + 9);
   }
-  // 主力进场/离场三角(同mcr10序列, 与柱同源): 上穿3=底绿▲进场, 下穿0=顶红▼离场
+  // 主力进场/离场三角(同控盘柱序列, 与柱同源): 上穿50=底绿▲进场, 跌破50=顶红▼离场
   var prev = null;
   ctx.lineWidth = 0.8; ctx.strokeStyle = "rgba(8,12,10,0.85)";
   for (i2 = 1; i2 < v.i1; i2++) {
-    var c2 = mc[kl[i2][0]];
+    var c2 = cs[i2];
     if (c2 == null) continue;
     if (prev != null && i2 >= v.i0) {
       var x3 = v.X(i2);
-      if (c2 >= 3 && prev < 3) { // 进场 ▲ 尖头朝上, 蹲面板底
+      if (c2 >= 50 && prev < 50) { // 进场 ▲ 尖头朝上, 蹲面板底
         ctx.fillStyle = "#35d99a";
         ctx.beginPath(); ctx.moveTo(x3, base - 8); ctx.lineTo(x3 - 3, base - 1); ctx.lineTo(x3 + 3, base - 1); ctx.closePath(); ctx.fill(); ctx.stroke();
-      } else if (c2 < 0 && prev >= 0) { // 离场 ▼ 尖头朝下, 贴面板顶
+      } else if (c2 < 50 && prev >= 50) { // 离场 ▼ 尖头朝下, 贴面板顶
         ctx.fillStyle = "#ff6f66";
         ctx.beginPath(); ctx.moveTo(x3 - 3, y2 + 11); ctx.lineTo(x3 + 3, y2 + 11); ctx.lineTo(x3, y2 + 18); ctx.closePath(); ctx.fill(); ctx.stroke();
       }
@@ -3406,7 +3398,7 @@ function renderCtrl(ctx, v) {
    口径: |主力|>截至当日近60日|主力|的60分位; 吸=主力进+散户出+当日不跌+收盘在60日区间下半部; 同戳3日内不重复 */
 function renderFundStamps(ctx, v) {
   if (S.klt !== "101" || !S.fflow || !S.fflow.length || noFund(S.active)) return;
-  var kl = S.kl, fm = {}, fflow = S.fflow, MC = mcrSeries();
+  var kl = S.kl, fm = {}, fflow = S.fflow;
   fflow.forEach(function (r, idx) { fm[r.d] = idx; });
   ctx.font = "bold 7px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   var lastXi = -99;
@@ -3423,8 +3415,6 @@ function renderFundStamps(ctx, v) {
     if (Math.abs(r.main) <= q60) continue;
     var pct = kl[i - 1][4] ? (kl[i][4] / kl[i - 1][4] - 1) * 100 : 0;
     if (!(r.main > 0 && r.small < 0 && pct >= 0)) continue; // 只剩"吸"的触发条件
-    var mcv = MC[kl[i][0]];
-    if (mcv == null || mcv <= 0) continue; // ks-0907-03: 资金控盘mcr10≤0(流出趋势)不盖"吸"——单日流入脉冲 vs 10日流出=假吸
     var hi = -1e18, lo = 1e18;
     for (var j = Math.max(0, i - 59); j <= i; j++) { if (kl[j][2] > hi) hi = kl[j][2]; if (kl[j][3] < lo) lo = kl[j][3]; }
     var pos = hi > lo ? (kl[i][4] - lo) / (hi - lo) : 0.5;
