@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-17 资金幅图默认开+价流背离标记直接画幅图上">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-18 可见滚筒(底部平移缩放+右侧纵缩放)+FVG/OB/BSL标签精简+画线变细+去穿线字">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -650,7 +650,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
   var right = v.padL + (v.i1 - v.i0) * v.step;
   ctx.strokeStyle = sel ? SEL : "#e6b43c";
   ctx.fillStyle = sel ? SEL : "#e6b43c";
-  ctx.lineWidth = sel ? 1.5 : 1;
+  ctx.lineWidth = sel ? 1.2 : 0.85;
   ctx.setLineDash(dg.dash ? [7, 5] : []);
   ctx.font = "10px -apple-system, sans-serif";
   ctx.textAlign = "left"; ctx.textBaseline = "middle";
@@ -683,7 +683,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
       sd3 = Math.sqrt(sd3 / nn);
       var pxP3 = v.priceH / (v.hi - v.lo);
       [["rgba(232,242,234,0.85)", 0, []], ["rgba(255,111,102,0.85)", 2, S.ind.solid ? [] : [5, 4]], ["rgba(53,217,154,0.85)", -2, S.ind.solid ? [] : [5, 4]]].forEach(function (L5) {
-        ctx.strokeStyle = sel ? SEL : L5[0]; ctx.lineWidth = sel ? 1.6 : 1.1; ctx.setLineDash(L5[2]);
+        ctx.strokeStyle = sel ? SEL : L5[0]; ctx.lineWidth = sel ? 1.3 : 0.9; ctx.setLineDash(L5[2]);
         ctx.beginPath();
         ctx.moveTo(v.X(iA), v.Y(ic3) - L5[1] * sd3 * pxP3);
         ctx.lineTo(v.X(iB), v.Y(ic3 + sl3 * (nn - 1)) - L5[1] * sd3 * pxP3);
@@ -701,8 +701,8 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
   else if (t === "hline" || t === "buy") {
     var tag0 = dg.tag || "";
     var lc = tag0.charAt(0) === "B" ? "#35d99a" : (tag0.charAt(0) === "S" ? "#ff6f66" : (tag0.indexOf("低吸") === 0 ? "#35d99a" : (tag0.indexOf("高抛") === 0 ? "#ff6f66" : "#e6b43c")));
-    if (t === "buy") { ctx.strokeStyle = sel ? SEL : "#ffd21f"; ctx.lineWidth = sel ? 1.6 : 1; }
-    else if (tag0) { ctx.strokeStyle = sel ? SEL : lc; ctx.lineWidth = sel ? 1.6 : 1; }
+    if (t === "buy") { ctx.strokeStyle = sel ? SEL : "#ffd21f"; ctx.lineWidth = sel ? 1.3 : 0.9; }
+    else if (tag0) { ctx.strokeStyle = sel ? SEL : lc; ctx.lineWidth = sel ? 1.3 : 0.9; }
     ctx.beginPath(); ctx.moveTo(v.padL, pts[0].y); ctx.lineTo(right, pts[0].y); ctx.stroke();
     // 标签放左缘深色胶囊(右缘留给昨/今高低), 加粗放大, 不再被裁切
     var lab = (dg.tag ? dg.tag + " " : (t === "buy" ? "买 " : "")) + (dg.pts[0].p != null ? fwp(dg.pts[0].p) : "");
@@ -752,7 +752,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     var pc = dg.pts[0].p ? (dg.pts[1].p / dg.pts[0].p - 1) * 100 : 0;
     var colP = pc >= 0 ? UP : DN;
     ctx.strokeStyle = sel ? SEL : colP;
-    ctx.lineWidth = sel ? 1.8 : 1.3;
+    ctx.lineWidth = sel ? 1.4 : 1;
     drawSeg(ctx, pts[0], pts[1]);
     var ang = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
     ctx.fillStyle = sel ? SEL : colP;
@@ -787,7 +787,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     for (var li = 0; li < 4; li++) drawSeg(ctx, pts[li], pts[li + 1]);
     ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
     drawSeg(ctx, pts[0], pts[2]); drawSeg(ctx, pts[1], pts[3]); drawSeg(ctx, pts[2], pts[4]);
-    ctx.setLineDash([]); ctx.lineWidth = sel ? 1.9 : 1.3;
+    ctx.setLineDash([]); ctx.lineWidth = sel ? 1.5 : 1;
     var P = dg.pts;
     var xa = Math.abs(P[1].p - P[0].p), ab = Math.abs(P[2].p - P[1].p);
     var bc = Math.abs(P[3].p - P[2].p), cd = Math.abs(P[4].p - P[3].p);
@@ -886,7 +886,7 @@ function renderPaneDrawings(ctx, v) {
       if (ly3 < v.pTop - 4 || ly3 > v.pTop + v.priceH + 4) continue;
       ctx.font = "10px -apple-system, sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
       ctx.fillStyle = cross2 ? "#ffd21f" : "rgba(217,180,92,0.85)";
-      ctx.fillText(cross2 ? "⚡穿线" : "⚡触线", _rt2 - 3, ly3 - 6);
+      ctx.fillText("⚡", _rt2 - 3, ly3 - 6);
     }
   }
   // 副图画线通道(泛化): 强弱T/VOL/MACD/实时主力/主力净额/控盘, 按比例锚渲染, 裁在各自副图区
@@ -1182,6 +1182,7 @@ function draw() {
   renderTqs(ctx, v);
   renderExtraPanes(ctx, v);
   renderPaneDrawings(ctx, v); // ks-0906-16: 副图画线+触线提醒, 画在所有副图之上
+  renderRollers(ctx, v); // ks-0906-18: 可见滚筒(底部时间轴/右侧价格轴)
   // 十字线 + 信息卡
   if (S.cross) {
     var ci = v.I(S.cross.x);
@@ -1389,6 +1390,8 @@ cv.addEventListener("touchstart", function (e) {
     return;
   }
   var pt = posT(e.touches[0]);
+  var _rl0 = rollerHit(pt); // ks-0906-18: 滚筒按钮优先于一切手势
+  if (_rl0 && !S.tool) { T = { mode: "roller", rid: _rl0 }; return; }
   // ks-0906-15: TV式时间轴横拉缩放——单指按住底部日期轴左右拖=横向缩放(右拉放大/左拉缩小)
   var vv0 = view();
   if (vv0 && !S.tool && pt.y > vv0.bottom + 2) { T = { mode: "hzoom", lx: pt.x, c0: S.count || (vv0.i1 - vv0.i0) }; hint("时间轴缩放 · 右拉放大 左拉缩小"); return; }
@@ -1499,6 +1502,7 @@ cv.addEventListener("touchend", function (e) {
     draw();
   }
   else if (T.mode === "draw") { S.ghost = null; draw(); }
+  else if (T.mode === "roller") { rollerDo(T.rid); }
   else if (T.mode === "free") {
     if (S.pending.length >= 2) {
       dlist().push({ type: "freedraw", pts: S.pending.slice() });
@@ -1534,6 +1538,7 @@ var M = null;
 cv.addEventListener("mousedown", function (e) {
   e.preventDefault();
   var pt = posT(e);
+  if (!S.tool && rollerHit(pt)) { rollerDo(rollerHit(pt)); return; } // ks-0906-18: 滚筒按钮
   if (S.tool === "freedraw" && !S.drawLock) {
     var aM = anchorAt(pt);
     if (aM) S.pending.push(aM);
@@ -1826,7 +1831,7 @@ function buildTools() {
       else {
         if (S.drawLock) { hint("画线已锁定 · 先点指标行「🔒画线锁」解锁"); }
         else { S.tool = t[0]; S.pending = []; S.selected = -1;
-        hint("「" + t[1] + "」已激活 · 在K线上依次点 " + t[2] + " 个点"); }
+        hint("「" + t[1] + "」已激活 · 依次点 " + t[2] + " 个点（主图/副图都能落点）"); }
       }
       syncTools(); draw();
     });
@@ -2315,8 +2320,11 @@ function renderICT(ctx, v) {
   var right = v.padL + (v.i1 - v.i0) * v.step;
   var d2 = dec();
   if (S.ind.fvg) {
-    ic.fvg.forEach(function (z) {
-      if (z.i < v.i0 - 5) return;
+    var _fz = ic.fvg.filter(function (z) { return z.i >= v.i0 - 5; });
+    var _lc9 = kl[n - 1][4];
+    _fz.forEach(function (z) { z._dd = Math.abs((z.top + z.bot) / 2 - _lc9); });
+    _fz.sort(function (a, b) { return a._dd - b._dd; }); // ks-0906-18: 只给离现价最近的2个区标字, 其余只画框, 防满屏字
+    _fz.forEach(function (z, zi) {
       var x0 = Math.max(v.padL, v.X(z.i));
       var yT = v.Y(z.top), yB = v.Y(z.bot);
       ctx.fillStyle = z.bull ? "rgba(53,217,154,0.10)" : "rgba(255,111,102,0.10)";
@@ -2326,9 +2334,11 @@ function renderICT(ctx, v) {
       if (z.part) ctx.setLineDash([4, 3]);
       ctx.strokeRect(x0, yT, right - x0, Math.max(1, yB - yT));
       ctx.setLineDash([]);
-      ctx.fillStyle = z.bull ? "#35d99a" : "#ff6f66";
-      ctx.font = "8.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText((z.bull ? "FVG支撑" : "FVG压力") + (z.part ? "·半补" : ""), x0 + 2, (yT + yB) / 2);
+      if (zi < 2) {
+        ctx.fillStyle = z.bull ? "#35d99a" : "#ff6f66";
+        ctx.font = "8.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText("FVG" + (z.part ? "·半" : ""), x0 + 2, (yT + yB) / 2);
+      }
     });
   }
   if (S.ind.liq) {
@@ -2345,7 +2355,7 @@ function renderICT(ctx, v) {
       ctx.setLineDash([]);
       ctx.fillStyle = col; ctx.font = "bold 9px -apple-system, sans-serif";
       ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      ctx.fillText((isB ? "Buy Side Liquidity " : "Sell Side Liquidity ") + L.p.toFixed(d2), x0 + 2, y - 2);
+      ctx.fillText((isB ? "BSL " : "SSL ") + L.p.toFixed(d2), x0 + 2, y - 2);
     });
   }
   if (S.ind.ms) {
@@ -2374,9 +2384,49 @@ function renderICT(ctx, v) {
       ctx.strokeRect(x0, yT, right - x0, Math.max(1, yB - yT));
       ctx.fillStyle = o.bull ? "#ffd21f" : "#ff8a80";
       ctx.font = "8.5px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText(o.bull ? "OB·进货区" : "OB·出货区", x0 + 2, (yT + yB) / 2);
+      ctx.fillText(o.bull ? "OB进货" : "OB出货", x0 + 2, (yT + yB) / 2);
     });
   }
+}
+/* ---- ks-0906-18: 可见滚筒 —— 底部时间轴[‹ › 平移][− + 横缩放], 右侧价格轴[+ − 纵缩放]; 点一下就动, 原手势保留 ---- */
+function renderRollers(ctx, v) {
+  var rr = [];
+  function btn(id, x, y, w, h, txt) {
+    rr.push({ id: id, x: x, y: y, w: w, h: h });
+    ctx.fillStyle = "rgba(26,34,30,0.92)"; ctx.strokeStyle = "rgba(120,140,130,0.55)"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#c9d6cd"; ctx.font = "bold 11px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(txt, x + w / 2, y + h / 2 + 0.5);
+  }
+  if (v.hh - v.bottom >= 13) { // 底部时间轴条内: 左平移 右缩放
+    var by = v.hh - 17, bh = 16;
+    btn("panL", v.padL + 1, by, 20, bh, "‹");
+    btn("panR", v.padL + 24, by, 20, bh, "›");
+    var zx = v.w - v.padR - 48;
+    btn("zmO", zx, by, 20, bh, "−");
+    btn("zmI", zx + 24, by, 20, bh, "+");
+  }
+  var ax = v.w - v.padR + 3, aw = v.padR - 10; // 右侧价格轴列: 上+ 下−
+  btn("yI", ax, v.pTop + 2, aw, 15, "+");
+  btn("yO", ax, v.bottom - 17, aw, 15, "−");
+  S.rollRects = rr;
+}
+function rollerHit(pt) {
+  var rr = S.rollRects || [];
+  for (var i = 0; i < rr.length; i++) { var r = rr[i]; if (pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h) return r.id; }
+  return null;
+}
+function rollerDo(id) {
+  var n = S.kl.length; if (!n) return false;
+  var step9 = Math.max(3, Math.round((S.count || 60) * 0.25));
+  if (id === "panL") S.end = Math.max(Math.min(S.count, n), (S.end || n) - step9);
+  else if (id === "panR") S.end = Math.min(n, (S.end || n) + step9);
+  else if (id === "zmI") S.count = Math.max(15, Math.round(S.count * 0.75));
+  else if (id === "zmO") S.count = Math.min(400, Math.round(S.count * 1.33));
+  else if (id === "yI") { S.yZoom = Math.min(6, (S.yZoom || 1) * 1.25); S.yOff = 0; }
+  else if (id === "yO") { S.yZoom = Math.max(1, (S.yZoom || 1) / 1.25); if (S.yZoom === 1) S.yOff = 0; }
+  else return false;
+  draw(); return true;
 }
 /* ================= 持仓成本线（直读 hq-mobile 的 portfolio_v2,同域名 localStorage 共享） ================= */
 function renderCostLine(ctx, v) {
