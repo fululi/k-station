@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-14 资金流缓存兜底(限流/凌晨关闸用上次成功数据,面板标·缓存不空窗)+被否强弱T改版分支已删">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-15 强弱T标记层重做(计算不动:出界逐根画点→按趟归并,点=该趟真极值K线带极值价,★刚进区,数字48px防叠,周日点缩小)">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -2930,23 +2930,44 @@ function renderTqs(ctx, v) {
     ctx.strokeStyle = sM >= 80 ? "#ff6f66" : (sM <= 20 ? "#35d99a" : "#e6b43c");
     ctx.beginPath(); ctx.moveTo(v.X(i - 1), PY(sA)); ctx.lineTo(v.X(i), PY(sB)); ctx.stroke();
   }
-  for (i = Math.max(v.i0, 1); i < v.i1; i++) {
-    var p0 = P2[i];
-    if (p0 >= 80 || p0 <= 20) { // ks-0906-20d: 高/低位点改成带白芯描边的大圆点(TV式), 红=高位回调警戒 绿=低位, 不再是一点看不见的小点
-      var dx2 = v.X(i), dy2 = PY(p0), dc = p0 >= 80 ? "#ff6f66" : "#35d99a";
-      ctx.fillStyle = dc; ctx.beginPath(); ctx.arc(dx2, dy2, 3.2, 0, 7); ctx.fill();
+  // ks-0907-15: 标记层重做(位置序列pos计算一字不动)——不再"出界就画点",改按"趟"(连续高/低位段)归并:
+  // ★=刚进区(每趟第一根,光秃不带数) 点=该趟真实极值K线(高位趟=区间内最高价那根/低位趟=最低价那根,带极值价数字)
+  // 分周期打法: 1/5/15/30/60分=全信息(做T主战场); 日=同逻辑; 周/月=点缩小; 数字横向<48px自动省略永不叠字
+  var dotR = S.klt >= 102 ? 2.6 : 3.2;
+  var lastTX = -1e9;
+  function tqsLab(x2, txt, y2, color) {
+    if (x2 - lastTX < 48) return; lastTX = x2;
+    ctx.fillStyle = color; ctx.font = "8px Menlo, monospace"; ctx.textAlign = "center";
+    ctx.fillText(txt, x2, y2);
+  }
+  var runs = [], cur = null;
+  for (var i2 = 0; i2 < n0; i2++) { // 趟归并走全数据,不看可视窗口——窗口截断的趟,极值照样是整趟真极值
+    var inHi = P2[i2] >= 80, inLo = P2[i2] <= 20;
+    if (!inHi && !inLo) { cur = null; continue; }
+    var dir = inHi;
+    if (!cur || cur.hi !== dir) { cur = { hi: dir, s: i2, e: i2 }; runs.push(cur); } else cur.e = i2;
+  }
+  runs.forEach(function (r) { // 找每趟真极值: 高位趟比最高价, 低位趟比最低价——点严格对齐K线真顶/真底
+    var xi = r.s;
+    for (var j = r.s; j <= r.e; j++) { if (r.hi ? S.kl[j][2] > S.kl[xi][2] : S.kl[j][3] < S.kl[xi][3]) xi = j; }
+    r.xi = xi;
+  });
+  runs.forEach(function (r) {
+    var s2 = r.s, xi = r.xi;
+    if (s2 >= v.i0 && s2 < v.i1) { // ★=刚进区
+      var p0 = P2[s2];
+      ctx.fillStyle = r.hi ? "#ffd21f" : "#35d99a";
+      ctx.font = "bold 11px -apple-system"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      ctx.fillText("\u2605", v.X(s2), r.hi ? PY(Math.min(p0 + 14, 118)) : PY(Math.max(p0 - 14, -18)));
+    }
+    if (xi >= v.i0 && xi < v.i1) { // 极值点=这趟的真顶/真底, 一颗就够
+      var dx2 = v.X(xi), dy2 = PY(P2[xi]), dc = r.hi ? "#ff6f66" : "#35d99a";
+      ctx.fillStyle = dc; ctx.beginPath(); ctx.arc(dx2, dy2, dotR, 0, 7); ctx.fill();
       ctx.strokeStyle = "rgba(8,12,10,0.9)"; ctx.lineWidth = 1; ctx.stroke();
       ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(dx2, dy2, 1.1, 0, 7); ctx.fill();
+      tqsLab(dx2, fwp(r.hi ? S.kl[xi][2] : S.kl[xi][3]), r.hi ? PY(Math.min(P2[xi] + 13, 125)) : PY(Math.max(P2[xi] - 13, -25)), dc);
     }
-    if ((p0 >= 80 && P2[i - 1] < 80) || (p0 <= 20 && P2[i - 1] > 20)) { // ★=刚进入高/低位区, 旁边标对应高/低点价
-      var hiZ = p0 >= 80;
-      ctx.fillStyle = hiZ ? "#ffd21f" : "#35d99a";
-      ctx.font = "bold 11px -apple-system"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-      ctx.fillText("\u2605", v.X(i), hiZ ? PY(Math.min(p0 + 14, 118)) : PY(Math.max(p0 - 14, -18)));
-      ctx.font = "8px Menlo, monospace";
-      ctx.fillText(fwp(hiZ ? S.kl[i][2] : S.kl[i][3]), v.X(i), hiZ ? PY(Math.min(p0 + 24, 128)) : PY(Math.max(p0 - 24, -28)));
-    }
-  }
+  });
   // 标题 + 末端位置读数
   var lastP = Math.round(P2[n0 - 1]);
   ctx.fillStyle = DIM; ctx.font = "9px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
