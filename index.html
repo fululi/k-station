@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-23 出场三角修方向+精致化(小三角描边)+图例?弹层+派恐吸洗单字戳(日K·监测同口径)">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0906-24 控盘进出场三角删除(回测证伪)+标记只留主图四戳一套语言+图例同步">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -138,12 +138,11 @@
 <div class="tpan" data-page-node-id="dKei7X02s66kfDU8hLChRw"><button type="button" onclick="panTime(-1)" title="早前" data-page-node-id="soce9cG5d6g4qGXYe79Hch">◀</button><button type="button" onclick="panTime(1)" title="往后" data-page-node-id="rSyCfM0fi4YypF3jRIhJaA">▶</button></div>
 <div class="lgpop" data-lgpop>
   <div class="hd">图例 · 点?关闭</div>
-  <b class="g">▲</b>主力进场(控盘柱上穿50) · <b class="r">▼</b>主力出场(下穿50)<br>
-  <b class="y">★</b>冲进高位区≥80(过热警戒) · <b class="g">★</b>跌进低位区≤20(超卖)<br>
-  <b class="r">●</b>仍在高位 / <b class="g">●</b>仍在低位 · 连排=单边延续<br>
-  <b class="r">▼破撑</b>收盘破支撑 · <b class="g">▲破压</b>收盘破压力(15分+有效,1/5分仅提醒)<br>
-  撑轨/压轨=动态支撑压力 · 触撑=贴上未破,只观察<br>
-  <b class="r">派</b>主力出散户接(顶) · <b class="r">恐</b>恐慌日大跌(底) · <b class="g">吸</b>主力进散户出(底) · <b class="o">洗</b>主力进价跌(底)<br>
+  <b class="r">派</b>主力出散户接(K线顶) · <b class="r">恐</b>恐慌日大跌(K线底)<br>
+  <b class="g">吸</b>主力进散户出(K线底) · <b class="o">洗</b>主力进但收跌(K线底)<br>
+  <b class="y">★</b>冲进高位区≥80(过热) · <b class="g">★</b>跌进低位区≤20(超卖) · ●连排=单边延续<br>
+  <b class="r">▼破撑</b>收盘破支撑 · <b class="g">▲破压</b>收盘破压力(15分+有效)<br>
+  控盘柱=筹码集中度(红>100 橙50+ 黄<50) · 触撑=贴上未破只观察<br>
   <b class="y">▲B/▼S</b>你的买卖画线 · <b class="o">⚠1.618</b>扩展到位别追
 </div>
 </div>
@@ -3298,24 +3297,8 @@ function renderCtrl(ctx, v) {
     ctx.fillStyle = lc;
     ctx.fillText(lv + " " + Math.round(cur), right - 4, y2 + 9);
   }
-  // ks-0906-23: 进/出场三角精致化(半宽3高7+深色描边, 不怼大不糊); ▲绿底=进场(尖头朝上=建仓) ▼红顶=出场(尖头朝下=出逃, 方向bug已修)
-  ctx.lineWidth = 0.8;
-  for (i2 = Math.max(v.i0 + 1, 1); i2 < v.i1; i2++) {
-    var cA = cs[i2 - 1], cB = cs[i2];
-    if (cA == null || cB == null) continue;
-    var x3 = v.X(i2);
-    if (cA < 50 && cB >= 50) { // 进场▲绿, 面板底部
-      ctx.fillStyle = "#35d99a"; ctx.beginPath();
-      ctx.moveTo(x3, y2 + h2 - 10); ctx.lineTo(x3 - 3, y2 + h2 - 3); ctx.lineTo(x3 + 3, y2 + h2 - 3);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(8,12,10,0.85)"; ctx.stroke();
-    } else if (cA >= 50 && cB < 50) { // 出场▼红, 面板顶部
-      ctx.fillStyle = "#ff6f66"; ctx.beginPath();
-      ctx.moveTo(x3 - 3, y2 + 14); ctx.lineTo(x3 + 3, y2 + 14); ctx.lineTo(x3, y2 + 21);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(8,12,10,0.85)"; ctx.stroke();
-    }
-  }
+  // ks-0906-24: 进/出场三角删除——回测证伪(出场后10日上证+0.5%/永鼎+9.4%/巨石+4.5%, 信号负价值);
+  // 标记只留主图"派/恐/吸/洗"四戳一套语言, 不再三套体系散落三个面板
 }
 /* ================= 资金结构单字戳(ks-0906-23): 派/恐/吸/洗, 日K专用, 与监测面板同口径(|主力|>近60日60分位才算极端) =================
    派(顶·浅红)=主力出+散户接 · 恐(底·红)=同上且当日跌>3% · 吸(底·绿)=主力进+散户出 · 洗(底·橙)=主力进+散户出但当日收跌 */
