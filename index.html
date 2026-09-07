@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-15 强弱T标记层重做(计算不动:出界逐根画点→按趟归并,点=该趟真极值K线带极值价,★刚进区,数字48px防叠,周日点缩小)">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0907-16 分钟级DDX(1/5/15/30/60分,真钱口径:fflow日内累计差分→单bar净额,20bar滚动净额/成交额)+DDX转向变色(升金/降灰)+白色MA10均线(日线DDX60同享)">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -143,7 +143,7 @@
 <div class="lgpop" data-lgpop>
   <div class="hd">图例 · 点?关闭</div>
   <b class="g">吸</b>主力进散户出·只在60日区间下半部盖(回测唯一正超额) · 派/恐/洗已回测证伪下线<br>
-  主力控盘: <b class="r">红</b>≥100 <b class="o">橙</b>≥50 <b class="y">黄</b>低(量价) · <b class="y">金线</b>DDX60真钱控盘,上行才信柱(回测+6.8% vs +0.9%)<br>
+  主力控盘: <b class="r">红</b>≥100 <b class="o">橙</b>≥50 <b class="y">黄</b>低(量价) · <b class="y">金线</b>DDX60真钱控盘,上行才信柱(回测+6.8% vs +0.9%) · DDX升=金/降=灰 · 白线=DDX MA10 · 分钟周期=DDX20同源口径<br>
   <b class="y">★</b>冲进高位区≥80(过热) · <b class="g">★</b>跌进低位区≤20(超卖) · ●连排=单边延续<br>
   <b class="r">▼破撑</b>收盘破支撑 · <b class="g">▲破压</b>收盘破压力(15分+有效) · 触撑=贴上未破只观察<br>
   <b class="y">▲B/▼S</b>你的买卖画线 · <b class="o">⚠1.618</b>扩展到位别追
@@ -409,6 +409,35 @@ function fetchFFlowMin(code, cb) {
       var rows = !err && parse(d);
       if (rows) win(rows);
     }, 8000);
+    setTimeout(function () { if (!done) { if (++tried2 < 2) fire2(); else lose(); } }, 9000);
+  }
+  fire2();
+}
+// ks-0907-16: 分钟级资金流(klt=5/15/30/60, 1分也可)——分钟DDX走势线数据源; 与fetchFFlowMin同口径双通道竞速
+// 口径注意: 东财fflow的f52/f56是"当日内累计值"(klt=1已在hq-mobile v5.135实测确认), 用同日内相邻差分还原单bar净额
+function fetchFFlowMinK(code, klt, cb) {
+  var q = "secid=" + secidOf(code) + "&ut=" + UT + "&lmt=0&klt=" + klt + "&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56";
+  function parse(d) {
+    if (!d || !d.data || !d.data.klines) return null;
+    var rows = [];
+    d.data.klines.forEach(function (row) {
+      var p = row.split(",");
+      if (p.length < 2) return;
+      var main = parseFloat(p[1]), sup = parseFloat(p[5]);
+      rows.push({ t: p[0], main: isNaN(main) ? 0 : main, sup: isNaN(sup) ? 0 : sup });
+    });
+    return rows.length ? rows : null;
+  }
+  var done = false, tried2 = 0;
+  function win(rows) {
+    if (done) return; done = true;
+    if (code !== S.active || klt !== (S.klt === "5D" ? "5" : S.klt)) return; // 换票/换周期后晚到的旧数据丢弃
+    S.rtflowK = rows; S.rtflowKErr = false; S.rtflowKCode = code; S.rtflowKKlt = S.klt; if (cb) cb(null);
+  }
+  function lose() { if (!done) { done = true; if (code !== S.active) return; S.rtflowKErr = true; if (cb) cb(new Error("无分钟资金流")); } }
+  function fire2() {
+    jsonp("https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?" + q, function (err, d) { var rows = !err && parse(d); if (rows) win(rows); }, 8000);
+    jsonp("https://push2.eastmoney.com/api/qt/stock/fflow/kline/get?" + q, function (err, d) { var rows = !err && parse(d); if (rows) win(rows); }, 8000);
     setTimeout(function () { if (!done) { if (++tried2 < 2) fire2(); else lose(); } }, 9000);
   }
   fire2();
@@ -3419,31 +3448,73 @@ function renderCtrl(ctx, v) {
       }
       if (ok2 && as > 0) ddx[i2] = ms / as * 100;
     }
-    var dLo = 1e18, dHi = -1e18;
-    for (i2 = Math.max(59, v.i0); i2 < v.i1; i2++) { if (ddx[i2] != null) { if (ddx[i2] < dLo) dLo = ddx[i2]; if (ddx[i2] > dHi) dHi = ddx[i2]; } }
-    if (dHi > -1e17 && dHi > dLo) {
-      var DY = function (x) { return base - (x - dLo) / (dHi - dLo) * (h2 - 16); };
-      ctx.strokeStyle = "#ffd21f"; ctx.lineWidth = 1.2;
-      ctx.beginPath(); var st2 = false;
-      for (i2 = Math.max(59, v.i0); i2 < v.i1; i2++) {
-        if (ddx[i2] == null) continue;
-        var px = v.X(i2), py = DY(ddx[i2]);
-        if (!st2) { ctx.moveTo(px, py); st2 = true; } else ctx.lineTo(px, py);
+    drawDdxLine(ctx, v, ddx, Math.max(59, v.i0), v.i1, base, h2, y2, right, "");
+  }
+  // ks-0907-16: 分钟级DDX走势线(1/5/15/30/60分,5D按5分取)——真钱口径: fflow当日内累计值差分还原单bar主力净额, 20bar滚动 净额/成交额×100
+  // 20bar≈5分线100分钟/15分线5小时窗口, 与日线DDX60同族不同周期; 数据拿不到就不画, 不拿日线数据冒充分钟线
+  var MIN_K = { "1": 1, "5": 1, "15": 1, "30": 1, "60": 1, "5D": 1 };
+  if (MIN_K[S.klt] && !noFund(S.active)) {
+    if (S.rtflowKCode !== S.active || S.rtflowKKlt !== S.klt) {
+      if (!S.rtflowKErr && !S._rtflowKLoading) { S._rtflowKLoading = true; fetchFFlowMinK(S.active, S.klt === "5D" ? "5" : S.klt, function () { S._rtflowKLoading = false; draw(); }); }
+    } else if (S.rtflowK && S.rtflowK.length) {
+      var bm = {}, rd = S.rtflowK;
+      for (var ri = 0; ri < rd.length; ri++) {
+        var _day = rd[ri].t.slice(0, 10);
+        bm[rd[ri].t.slice(0, 16)] = ri > 0 && rd[ri - 1].t.slice(0, 10) === _day ? rd[ri].main - rd[ri - 1].main : rd[ri].main;
       }
-      ctx.stroke();
-      var di = -1;
-      for (i2 = Math.min(n - 1, v.i1 - 1); i2 >= Math.max(59, v.i0); i2--) if (ddx[i2] != null) { di = i2; break; }
-      if (di >= 0) {
-        var d5 = null;
-        for (var j3 = di - 5; j3 >= Math.max(59, v.i0); j3--) if (ddx[j3] != null) { d5 = ddx[j3]; break; }
-        var dir = d5 != null ? (ddx[di] > d5 ? "↑" : "↓") : "";
-        ctx.font = "bold 8px Menlo, monospace"; ctx.textAlign = "left";
-        ctx.fillStyle = "#ffd21f";
-        ctx.fillText("DDX" + (ddx[di] >= 0 ? "+" : "") + ddx[di].toFixed(1) + dir, v.padL + 52, y2 + 9);
+      var W20 = 20, ddxm = new Array(n).fill(null);
+      for (i2 = W20 - 1; i2 < n; i2++) {
+        var ms3 = 0, as3 = 0, ok3 = true;
+        for (var j4 = i2 - W20 + 1; j4 <= i2; j4++) {
+          var bv = bm[String(kl[j4][0]).slice(0, 16)];
+          if (bv == null) { ok3 = false; break; }
+          ms3 += bv; as3 += kl[j4][5] * 100 * kl[j4][4];
+        }
+        if (ok3 && as3 > 0) ddxm[i2] = ms3 / as3 * 100;
       }
+      drawDdxLine(ctx, v, ddxm, Math.max(W20 - 1, v.i0), v.i1, base, h2, y2, right, "20");
     }
   }
   // ks-0907-05: 进出场三角全删(用户定:标了对不上=不该标), 面板只留柱子本身, 时机看强弱T
+}
+// ks-0907-16: DDX线公共绘制——转向变色(升=金 #ffd21f / 降=灰蓝 #6b7a94) + 白色MA10均线 + 末端读数(5期方向↑↓)
+function drawDdxLine(ctx, v, ddx, i0, i1, base, h2, y2, right, tag) {
+  var dLo = 1e18, dHi = -1e18, i;
+  for (i = Math.max(0, i0); i < i1; i++) { var x = ddx[i]; if (x != null) { if (x < dLo) dLo = x; if (x > dHi) dHi = x; } }
+  if (!(dHi > -1e17 && dHi > dLo)) return;
+  var DY = function (x) { return base - (x - dLo) / (dHi - dLo) * (h2 - 16); };
+  ctx.lineWidth = 1.2;
+  var pi = -1;
+  for (i = Math.max(0, i0); i < i1; i++) {
+    if (ddx[i] == null) continue;
+    if (pi >= 0) {
+      ctx.strokeStyle = ddx[i] >= ddx[pi] ? "#ffd21f" : "#6b7a94";
+      ctx.beginPath(); ctx.moveTo(v.X(pi), DY(ddx[pi])); ctx.lineTo(v.X(i), DY(ddx[i])); ctx.stroke();
+    }
+    pi = i;
+  }
+  // 白色MA10均线
+  var ma = new Array(ddx.length).fill(null);
+  for (i = 0; i < ddx.length; i++) {
+    if (ddx[i] == null) continue;
+    var s4 = 0, c4 = 0;
+    for (var j5 = Math.max(0, i - 9); j5 <= i; j5++) if (ddx[j5] != null) { s4 += ddx[j5]; c4++; }
+    if (c4 >= 5) ma[i] = s4 / c4;
+  }
+  ctx.strokeStyle = "rgba(240,244,250,0.85)"; ctx.lineWidth = 1;
+  ctx.beginPath(); var st2 = false;
+  for (i = Math.max(0, i0); i < i1; i++) { if (ma[i] == null) continue; var px = v.X(i), py = DY(ma[i]); if (!st2) { ctx.moveTo(px, py); st2 = true; } else ctx.lineTo(px, py); }
+  ctx.stroke();
+  var di = -1;
+  for (i = Math.min(ddx.length - 1, i1 - 1); i >= Math.max(0, i0); i--) if (ddx[i] != null) { di = i; break; }
+  if (di >= 0) {
+    var d5 = null;
+    for (var j3 = di - 5; j3 >= Math.max(0, i0); j3--) if (ddx[j3] != null) { d5 = ddx[j3]; break; }
+    var dir = d5 != null ? (ddx[di] > d5 ? "↑" : (ddx[di] < d5 ? "↓" : "")) : "";
+    ctx.font = "bold 8px Menlo, monospace"; ctx.textAlign = "left";
+    ctx.fillStyle = "#ffd21f";
+    ctx.fillText("DDX" + tag + (ddx[di] >= 0 ? "+" : "") + ddx[di].toFixed(1) + dir, v.padL + 52, y2 + 9);
+  }
 }
 /* ================= 资金结构单字戳(ks-0906-27): 只留"吸" =================
    ks-0906-27 回测(stamp_bt.html · 3持仓×120日·东财资金流)结论:
