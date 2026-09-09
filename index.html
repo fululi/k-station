@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0910-41 房主0910凌晨定稿:做T标记改小圆点+当日S1B1序号(撤大三角/价格字/配对箭头糊屏)+选中画线＋提醒常驻线右端(修出现了点不到)+工具栏资金强弱前置/EMA挪后/副图上置挪清空排 ｜0910-40 B5:DDX60分母改官方f57净占比(缺f57才回退量×价估算,除权票跨期可比)+B8:监测面板价流背离方向阈值改回文档口径±0.3%(原+0.29%也标价弱) ｜0910-39 缩放记忆(ks_zoom_v1)+提醒清空确认闸 ｜0909-38 审计修复:DDX60补klt101显式硬门+ETF短路noFund+周月线DDX文案 ｜0909-37 分钟DDX取不到时补真实日线读数 ｜0909-36撤日线平铺假线">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0910-43 房主0910清晨图面清墙:①做T序号小字只配给视野内最近一个交易日,更早只留圆点(修9/1一天24笔B1..B12/S1..S12竖向堆墙糊左缘,15/30/60分/日线同病) ②左缘档位签/低吸高抛签纵向防撞(同槽<10px只留一个,线+右端三角照画) ③成本横幅二合一:⚡现价在成本上方并进主签(原两条横幅同数+7.7%重复叠图) ｜ks-0910-42 房主0910凌晨四连修:①＋提醒钮TradingView式跟手(光标/手指走到哪钮跟到哪,贴线在触点处的位置;点哪条线钮去哪条,斜线中段也认;画线工具激活时不弹不挡画线;显示后粘6秒必收不常驻;平移/缩放/拖线后draw末尾统一重挂跟线走,线删钮收) ②副图🔔标记边界按各自面板算(原统一估界漏算中间副图,强弱T提醒挂上不显示) ③simple/内嵌模式不渲染本机手动画线(修持仓App内嵌乱七八糟的线;URL档线+BS标记不受影响) ④右缘价签全局去重(同价位±0.15%只留一个,防压42.87/42.88/42.89三连糊屏) ｜ks-0910-41 房主0910凌晨定稿:做T标记改小圆点+当日S1B1序号(撤大三角/价格字/配对箭头糊屏)+选中画线＋提醒常驻线右端(修出现了点不到)+工具栏资金强弱前置/EMA挪后/副图上置挪清空排 ｜0910-40 B5:DDX60分母改官方f57净占比(缺f57才回退量×价估算,除权票跨期可比)+B8:监测面板价流背离方向阈值改回文档口径±0.3%(原+0.29%也标价弱) ｜0910-39 缩放记忆(ks_zoom_v1)+提醒清空确认闸 ｜0909-38 审计修复:DDX60补klt101显式硬门+ETF短路noFund+周月线DDX文案 ｜0909-37 分钟DDX取不到时补真实日线读数 ｜0909-36撤日线平铺假线">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -932,13 +932,19 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
     // ks-0906-20 B/S档位线轻量化(对标主流app): 左缘小字无胶囊 + 线右端小三角(B▲在下/S▼在上), 不再大胶囊占位
     var isBS = dg.auto && /^[BS]\d+$/.test(tag0);
     if (isBS) {
-      ctx.font = "8.5px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillStyle = "rgba(8,12,10,0.45)";
-      var bsT = tag0 + " " + (dg.pts[0].p != null ? fwp(dg.pts[0].p) : "");
-      var bsW = ctx.measureText(bsT).width;
-      ctx.fillRect(v.padL + 2, pts[0].y - 11, bsW + 4, 10);
-      ctx.fillStyle = sel ? SEL : lc;
-      ctx.fillText(bsT, v.padL + 4, pts[0].y - 6);
+      // ks-0910-43: 左缘档位签纵向防撞——同槽(<10px)只留先画的, 线+右端小三角照画, 防多档贴近时左缘糊成一堵墙
+      var ySlot = pts[0].y - 6, clashL = false, la = v._llab || [];
+      for (var li2 = 0; li2 < la.length; li2++) if (Math.abs(la[li2] - ySlot) < 10) { clashL = true; break; }
+      if (!clashL) {
+        (v._llab = v._llab || []).push(ySlot);
+        ctx.font = "8.5px Menlo, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(8,12,10,0.45)";
+        var bsT = tag0 + " " + (dg.pts[0].p != null ? fwp(dg.pts[0].p) : "");
+        var bsW = ctx.measureText(bsT).width;
+        ctx.fillRect(v.padL + 2, pts[0].y - 11, bsW + 4, 10);
+        ctx.fillStyle = sel ? SEL : lc;
+        ctx.fillText(bsT, v.padL + 4, pts[0].y - 6);
+      }
       var tx0 = right - 10, ty0 = pts[0].y;
       ctx.fillStyle = sel ? SEL : lc;
       ctx.beginPath();
@@ -947,6 +953,11 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
       ctx.closePath(); ctx.fill();
       return;
     }
+    // ks-0910-43: 非档位线左缘签同走防撞(低吸/高抛/买线)
+    var yS2 = ly - 5, cl2 = false, la2 = v._llab || [];
+    for (var li3 = 0; li3 < la2.length; li3++) if (Math.abs(la2[li3] - yS2) < 12) { cl2 = true; break; }
+    if (cl2) return;
+    (v._llab = v._llab || []).push(yS2);
     ctx.font = "bold 10px Menlo, monospace"; // hq-mobile请求: 小字
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
     var tw = ctx.measureText(lab).width;
@@ -1061,7 +1072,7 @@ function renderOneDrawing(ctx, v, im, dg, sel) {
 }
 function renderDrawings(ctx, v) {
   var im = idxMap(v);
-  var dl = visList(); // ks-0909-30: 主图渲染纳入跨周期价位线
+  var dl = S.simple ? [] : visList(); // ks-0909-30: 主图渲染纳入跨周期价位线; ks-0910-42: simple/内嵌模式不渲染本机手动画线(小图上全手画线=乱七八糟,房主0910原话),URL档线/BS标记走独立通道不受影响
   // 水平线标签防重叠: 同簇标签按竖向位置排序后错开(最小间距13px),仅影响文字位置不动线
   var hls = [];
   for (var hi = 0; hi < dl.length; hi++) {
@@ -1096,7 +1107,7 @@ function renderDrawings(ctx, v) {
 }
 /* ---- ks-0906-16: 副图画线通道 + 触线提醒 —— 在所有副图之后渲染(不被柱子/曲线盖住, 不被主图裁切剪掉) ---- */
 function renderPaneDrawings(ctx, v) {
-  var im = idxMap(v), dl = visList(); // ks-0909-30: 触线提醒同样对跨周期价位线生效; 副图通道仍按pane过滤不受影响
+  var im = idxMap(v), dl = S.simple ? [] : visList(); // ks-0909-30: 触线提醒同样对跨周期价位线生效; 副图通道仍按pane过滤不受影响; ks-0910-42: simple/内嵌跳过本机画线
   // 触线提醒: 主图画线被最新价贴近(±0.3%)/穿越时, 线右端亮⚡标记, 不用盯盘
   if (S.kl.length) {
     var _c0 = S.kl[S.kl.length - 1][4], _c1 = S.kl.length >= 2 ? S.kl[S.kl.length - 2][4] : _c0;
@@ -1142,13 +1153,15 @@ function renderPaneDrawings(ctx, v) {
   });
   // ks-0907-21: 已挂提醒的🔔标记——主图线按价位,强弱T附图线按0-100值;灰=已触发
   var _alArr = ALERTS[S.active];
-  if (_alArr && _alArr.length) {
+  if (_alArr && _alArr.length && !S.simple) {
     ctx.font = "10px -apple-system, sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
     var _rt3 = v.padL + (v.i1 - v.i0) * v.step;
     _alArr.forEach(function (a) {
-      if (a.kind === "tqs" && !v.tqsH) return;
-      var y = a.kind === "px" ? v.Y(a.val) : yOfPane(v, "tqs", a.val);
-      if (y < v.pTop - 6 || y > v.pTop + v.priceH + (v.volH || 0) + (v.tqsH || 0) + 40) return;
+      // ks-0910-42: 🔔边界按各自面板算——原统一用"主图+VOL+强弱T"高度估界,中间隔着MACD/资金流等副图时强弱T的🔔被误剪,挂上提醒却看不到标记(房主报"幅图上不能画提醒线"的真凶之一)
+      var y, loB, hiB;
+      if (a.kind === "tqs") { var rcA = paneRectOf(v, "tqs"); if (!rcA) return; y = yOfPane(v, "tqs", a.val); loB = rcA.y - 6; hiB = rcA.y + rcA.h + 6; }
+      else { y = v.Y(a.val); loB = v.pTop - 6; hiB = v.pTop + v.priceH + 6; }
+      if (y < loB || y > hiB) return;
       ctx.fillStyle = a.armed ? "#4aa3ff" : "rgba(120,130,145,0.6)";
       ctx.fillText("🔔" + (a.note ? " " + a.note : ""), _rt3 - 3, y - 6);
     });
@@ -1169,34 +1182,80 @@ function lineLevelNow(v, im, da) { // 画线在最新K线处的水平值+屏幕Y
   return { val: lv, y: pane ? yOfPane(v, "tqs", lv) : v.Y(lv), kind: pane ? "tqs" : "px" };
 }
 var alBtn = document.getElementById("alBtn"), _alHov = null, _alHideT = 0;
-function alHideLater() { clearTimeout(_alHideT); _alHideT = setTimeout(function () { if (alBtn && S.selected < 0) { alBtn.style.display = "none"; _alHov = null; } }, 6000); } // ks-0910-41: 3s→6s;选中画线期间到点也不收(选中常驻语义)
+// ks-0910-42: 线在触点x处的屏幕Y——trend/ray按斜率延伸到触点位置算(不再只认最新K线处的值);点线中段也能认出这条线
+function lineYAtX(v, im, da, x) {
+  if (!da.pts || !da.pts.length) return null;
+  var pane = da.pts[0].pane || null;
+  if (pane && pane !== "tqs") return null;
+  if ((da.type === "hline" || da.type === "buy") && da.pts[0].p != null) return yOfPane(v, pane, da.pts[0].p);
+  if ((da.type === "trend" || da.type === "ray") && da.pts.length >= 2) {
+    var qA = anchorXY(v, im, da.pts[0]), qB = anchorXY(v, im, da.pts[1]);
+    if (!qA || !qB) return null;
+    if (Math.abs(qB.x - qA.x) < 0.001) return qA.y;
+    return qA.y + (qB.y - qA.y) / (qB.x - qA.x) * (x - qA.x);
+  }
+  return null;
+}
+// ks-0910-42c: 图内价签全局登记(每帧在drawReal重置v._rlab)——同价位(±0.15%)只留一个标签,防"压42.87/42.88/42.89"重复糊屏(房主0910:"重复成什么鬼样子");价位不同的纵向错开≥12px
+function rlabDup(v, p) { var a = v._rlab || []; for (var i = 0; i < a.length; i++) if (a[i].p > 0 && Math.abs(a[i].p / p - 1) < 0.0015) return true; return false; }
+function rlabReg(v, p, y) { if (!v._rlab) v._rlab = []; var a = v._rlab, yy = y, g = 0; for (;;) { var clash = false; for (var i = 0; i < a.length; i++) if (Math.abs(a[i].y - yy) < 12) { clash = true; break; } if (!clash || ++g > 24) break; yy += 12; if (yy > v.pTop + v.priceH - 8) yy = v.pTop + 8; } a.push({ p: p, y: yy }); return yy; }
+// ks-0910-42b: 提醒钮落位(抽共用)——跟手:落在触点/光标右上方、贴线在触点处的位置;无触点(选中等场景)落线右端;夹紧在图区内防跑出屏
+var _alPX = -999, _alPY = -999; // 最近一次的触点/光标位置(重挂时保持跟手位)
+function alPlace(v, y, px) {
+  var wr = document.getElementById("chartwrap").getBoundingClientRect(), cr = cv.getBoundingClientRect();
+  var rt = v.padL + (v.i1 - v.i0) * v.step;
+  var lx = (px != null && px > -100) ? (px + 16) : (rt - 58); // 触点右侧16px;没触点回右端
+  lx = Math.max(v.padL + 2, Math.min(rt - 56, lx));
+  alBtn.style.display = "block";
+  alBtn.style.left = (cr.left - wr.left + lx) + "px";
+  var tp = cr.top - wr.top + y - 26;
+  alBtn.style.top = Math.max(2, Math.min(wr.height - 34, tp)) + "px";
+}
+// ks-0910-42: draw()末尾统一重挂——平移/缩放/拖线/换数据后提醒钮跟着线走,不再冻在旧位置(房主:"我换到别的价格他也不动");线被删→钮一起收
+function alRepos() {
+  if (!alBtn || alBtn.style.display !== "block") return;
+  var v = view(); if (!v || !S.kl.length) { alBtn.style.display = "none"; _alHov = null; return; }
+  var im = idxMap(v), dl = dlist(), lv = null, da2 = null;
+  if (S.selected >= 0 && dl[S.selected]) { da2 = dl[S.selected]; lv = lineLevelNow(v, im, da2); }
+  if (!lv && _alHov) {
+    for (var ai = 0; ai < dl.length; ai++) {
+      var l2 = lineLevelNow(v, im, dl[ai]);
+      if (l2 && _alHov.val > 0 && l2.kind === _alHov.kind && Math.abs(l2.val / _alHov.val - 1) < 0.002) { lv = l2; da2 = dl[ai]; break; }
+    }
+  }
+  if (!lv) { alBtn.style.display = "none"; _alHov = null; return; }
+  _alHov = lv;
+  var yx = (_alPX > -100 && da2) ? lineYAtX(v, im, da2, _alPX) : null;
+  alPlace(v, yx != null ? yx : lv.y, _alPX);
+}
+function alHideLater() { clearTimeout(_alHideT); _alHideT = setTimeout(function () { if (alBtn) { alBtn.style.display = "none"; _alHov = null; } }, 6000); } // ks-0910-42b: 到点必收(含选中态)——房主:"不是它一直显示着不动,挡我画线"
 function cancelAlHide() { clearTimeout(_alHideT); }
-function alTol() { return (alBtn && alBtn.style.display === "block") ? 36 : 14; } // ks-0909-33: 滞回——按钮已弹出时放宽容差,移向按钮(在线上方24px)不会半路收回
+function alTol() { return (alBtn && alBtn.style.display === "block") ? 36 : 14; } // ks-0909-33: 滞回——按钮已弹出时放宽容差,移向按钮不会半路收回
 function updAlBtn(px2, py2, sticky) {
   if (!alBtn) return;
   if (!S.kl.length) { alBtn.style.display = "none"; _alHov = null; return; } // ks-0909-33: 审计A3——藏按钮必清_alHov,杜绝 stale 挂错价位
+  if (S.tool) { alBtn.style.display = "none"; _alHov = null; return; } // ks-0910-42b: 画线工具激活时不弹提醒钮——别挡画线(房主:"它不动的话我要划线的")
+  if (px2 > -100) { _alPX = px2; _alPY = py2; }
   var v = view(); if (!v) { alBtn.style.display = "none"; _alHov = null; return; }
   var im = idxMap(v), dl = dlist(), best = null;
   for (var ai = 0; ai < dl.length; ai++) {
     var lv = lineLevelNow(v, im, dl[ai]); if (!lv) continue;
-    var dy = Math.abs(py2 - lv.y);
-    if (dy < alTol() && (!best || dy < best.dy)) best = { dy: dy, lv: lv };
+    var yx = lineYAtX(v, im, dl[ai], px2); if (yx == null) continue; // ks-0910-42: 按触点x处的线Y判距离——点哪条线钮去哪条(原按右端值测距,点斜线中段认不出)
+    var dy = Math.abs(py2 - yx);
+    if (dy < alTol() && (!best || dy < best.dy)) best = { dy: dy, lv: lv, y: yx };
   }
-  // ks-0910-41: 选中画线→＋提醒常驻该线右端(房主原话"画线的话旁边得有添加提醒点上")——不靠hover/定时器时序,选中即在、取消选中才收;修"提醒出现了点不到"反复发作
+  // 选中画线: 触点不在任何线附近时,钮落选中线(触点x处的线Y,跟手;无触点=右端)
   if (!best && S.selected >= 0 && dl[S.selected]) {
     var lv2 = lineLevelNow(v, im, dl[S.selected]);
-    if (lv2) best = { dy: 0, lv: lv2 };
+    if (lv2) { var yx2 = px2 > -100 ? lineYAtX(v, im, dl[S.selected], px2) : null; best = { dy: 0, lv: lv2, y: yx2 != null ? yx2 : lv2.y }; }
   }
   if (!best) { if (!sticky) { alBtn.style.display = "none"; _alHov = null; } return; }
   _alHov = best.lv;
-  var wr = document.getElementById("chartwrap").getBoundingClientRect(), cr = cv.getBoundingClientRect();
-  alBtn.style.display = "block";
-  alBtn.style.left = (cr.left - wr.left + v.padL + (v.i1 - v.i0) * v.step - 58) + "px";
-  alBtn.style.top = (cr.top - wr.top + best.lv.y - 24) + "px";
-  if (sticky) alHideLater(); // 触屏:按钮粘住6秒,松手不会立刻消失
+  alPlace(v, best.y, px2);
+  if (sticky) alHideLater(); // 触屏:松手后粘6秒,够点;到点必收不常驻
 }
-// ks-0910-41: 选中/取消选中画线后重挂提醒钮(syncTools在选中变化时被调)
-function alSyncSel() { if (alBtn) { cancelAlHide(); updAlBtn(-999, -999, false); } }
+// ks-0910-42b: 选中/取消选中画线后重挂提醒钮(syncTools在选中变化时被调)——用最近触点定位(钮出现在手指点的地方);点了空白立即收;显示后粘6秒必收
+function alSyncSel() { if (!alBtn) return; cancelAlHide(); updAlBtn(_alPX, _alPY, false); if (alBtn.style.display === "block") alHideLater(); }
 cv.addEventListener("pointermove", function (ev) {
   if (ev.pointerType && ev.pointerType !== "mouse") return;
   if (alBtn && alBtn.style.display === "block") { // ks-0909-33: 光标已在按钮上/边缘→保持,别半路收回
@@ -1308,6 +1367,7 @@ function draw() {
     S._degraded = true;
     try { hint("⚠ 渲染异常已降级为简K（画线/副图暂隐）· 控制台[draw]有错误明细 · 反馈请带此截图"); } catch (e3) {}
   }
+  try { alRepos(); } catch (e4) {} // ks-0910-42: 提醒钮随图重挂(平移/缩放/拖线后跟线走)
 }
 function drawFallback() {
   var ctx = cv.getContext("2d");
@@ -1332,6 +1392,7 @@ function drawReal() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, hh);
   var v = view();
+  if (v) { v._rlab = []; v._llab = []; } // ks-0910-42c: 价签登记每帧重置(右缘_rlab/左缘档位签_llab)
   if (!v) {
     ctx.fillStyle = DIM; ctx.font = "13px sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -2824,10 +2885,12 @@ function renderAutoTri(ctx, v) {
     // 触轨: 现价贴轨0.3%内 → ks-0906-9回测证伪"触撑即买"(胜率36-48%均值负), 撑轨只给中性观察, 压轨保留S
     var touching = (pc2 != null && pv > 0 && Math.abs(pc2 / pv - 1) < 0.003);
     if (yE > v.pTop + 6 && yE < v.pTop + v.priceH - 6) {
-      ctx.font = (touching ? "bold 10px" : "9.5px") + " -apple-system, sans-serif";
-      ctx.textAlign = "right"; ctx.textBaseline = "middle";
-      ctx.fillStyle = touching ? (isHigh ? "#ff8a80" : "rgba(141,163,152,0.9)") : col;
-      ctx.fillText((touching ? (isHigh ? "触压轨·S " : "触撑·观察 ") : (isHigh ? "压轨 " : "撑轨 ")) + pe.toFixed(dec()), right2 - 4, yE + (isHigh ? -8 : 11));
+      if (!rlabDup(v, pe)) { // ks-0910-42c: 同价位已有标签(如实时撑压)→轨道签让位,不重复糊屏
+        ctx.font = (touching ? "bold 10px" : "9.5px") + " -apple-system, sans-serif";
+        ctx.textAlign = "right"; ctx.textBaseline = "middle";
+        ctx.fillStyle = touching ? (isHigh ? "#ff8a80" : "rgba(141,163,152,0.9)") : col;
+        ctx.fillText((touching ? (isHigh ? "触压轨·S " : "触撑·观察 ") : (isHigh ? "压轨 " : "撑轨 ")) + pe.toFixed(dec()), right2 - 4, rlabReg(v, pe, yE + (isHigh ? -8 : 11)));
+      }
     }
     // 破轨提醒: 最近3根收盘穿越轨道 → ks-0906-9回测分级: 15分及以上给强指令(破压强势80%涨/破撑83%续跌), 1/5分噪音大只标中性破位
     for (var jb = Math.max(b2 + 1, n - 3); jb < n; jb++) {
@@ -3019,7 +3082,8 @@ function renderCostLine(ctx, v) {
     }
     var last = S.kl.length ? S.kl[S.kl.length - 1][4] : null;
     var pct = (last != null) ? (last / h.cost - 1) * 100 : null;
-    var lab = "成本 " + h.cost.toFixed(dec()) + (pct != null ? " · " + (pct >= 0 ? "浮盈+" : "浮亏") + Math.abs(pct).toFixed(1) + "%" : "") + (off ? "（线在当前视野外）" : "");
+    // ks-0910-43: ⚡"现价在成本上方"并进主签一个胶囊(原两条横幅同数+7.7%重复叠图,房主0910截图实锤)
+    var lab = (pct != null && pct >= 0 ? "⚡" : "") + "成本 " + h.cost.toFixed(dec()) + (pct != null ? " · " + (pct >= 0 ? "浮盈+" : "浮亏-") + Math.abs(pct).toFixed(1) + "%" : "") + (off ? "（线在当前视野外）" : "");
     ctx.font = "bold 11px -apple-system, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     var tw = ctx.measureText(lab).width;
     var ly = off ? v.pTop + 26 : y - 14;
@@ -3028,16 +3092,6 @@ function renderCostLine(ctx, v) {
     ctx.fillRect(v.padL + 3, ly - 8, tw + 10, 16);
     ctx.fillStyle = pct != null && pct >= 0 ? "#ff8078" : "#e8f2ea";
     ctx.fillText(lab, v.padL + 8, ly);
-    // 回到成本上方: 事实提醒,非操作建议
-    if (pct != null && pct >= 0) {
-      var tip = "⚡现价在成本上方 +" + pct.toFixed(1) + "%";
-      ctx.font = "10px -apple-system, sans-serif";
-      var tw2 = ctx.measureText(tip).width;
-      ctx.fillStyle = "rgba(120,30,30,0.9)";
-      ctx.fillRect(v.padL + 3, ly + 11, tw2 + 10, 15);
-      ctx.fillStyle = "#ffb3ab";
-      ctx.fillText(tip, v.padL + 8, ly + 19);
-    }
   } catch (e) {}
 }
 /* ================= 昨高/昨低（LuxAlgo 风格：上周期蜡烛标记 + 高低水平线，可切 日/周） ================= */
@@ -3176,8 +3230,17 @@ function renderTradeMarks(ctx, v, kl, i0, i1) {
     seq[k] = (seq[k] || 0) + 1;
     m0.lb = (m0.side === "b" ? "B" : "S") + seq[k];
   });
+  // ks-0910-43: 序号小字只配给视野内最近一个交易日, 更早的只留圆点——多日全标会竖向堆成一堵墙糊住左缘(房主0910 05:27截图实锤: 9/1一天24笔B1..B12/S1..S12全挤成一列; 15/30/60分/日线同病)
+  var maxD = "";
+  mk.forEach(function (m0) { if (m0.D > maxD) maxD = m0.D; });
   // 标签纵向错开: x相近(<30px)且y相叠(<10px)顺次下推
-  var lb = mk.map(function (m0) { var buy = m0.side === "b"; return { m: m0, y: buy ? m0.y + 14 : m0.y - 10 }; });
+  var lb = [];
+  mk.forEach(function (m0) {
+    if (m0.D !== maxD) return; // 非最近日: 只画点不配字
+    if (m0.x < v.padL + 12) return; // 贴左缘会被裁, 只留点
+    var buy = m0.side === "b";
+    lb.push({ m: m0, y: buy ? m0.y + 14 : m0.y - 10 });
+  });
   lb.sort(function (a, b) { return a.y - b.y; });
   for (var li = 0; li < lb.length; li++) {
     var L0 = lb[li];
@@ -3313,8 +3376,10 @@ function renderLuxSR(ctx, v, kl, i0, i1) {
     ctx.strokeStyle = "rgba(" + col + ",0.3)"; ctx.lineWidth = 0.7;
     ctx.strokeRect(x0, yT, right - x0, yB - yT);
     ctx.beginPath(); ctx.moveTo(x0, v.Y(z.p)); ctx.lineTo(right, v.Y(z.p)); ctx.stroke();
-    ctx.fillStyle = z.sup ? "#4fd79b" : "#ff8a80"; ctx.textAlign = "left";
-    ctx.fillText((z.sup ? "撑" : "压") + " " + fwp(z.p), x0 + 3, yT - 2);
+    if (!rlabDup(v, z.p)) { // ks-0910-42c: 同价位标签全局去重
+      ctx.fillStyle = z.sup ? "#4fd79b" : "#ff8a80"; ctx.textAlign = "left";
+      ctx.fillText((z.sup ? "撑" : "压") + " " + fwp(z.p), x0 + 3, rlabReg(v, z.p, yT - 2));
+    }
   });
 }
 
