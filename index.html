@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="K-STATION" data-page-node-id="eakkpnvZONjpAgIoWJfWXR">
 <meta name="theme-color" content="#0a0e0b" data-page-node-id="G8xVsmyJW6v9vqF1PGoexF">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%230a0e0b'/%3E%3Crect x='30' y='44' width='10' height='40' fill='%23ff6f66'/%3E%3Crect x='48' y='30' width='10' height='54' fill='%2335d99a'/%3E%3Crect x='66' y='52' width='10' height='34' fill='%23ff6f66'/%3E%3Crect x='84' y='38' width='10' height='48' fill='%2335d99a'/%3E%3C/svg%3E" data-page-node-id="xPNcNcdDoerIE4BP3A0aDV">
-<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0910-40 B5:DDX60分母改官方f57净占比(缺f57才回退量×价估算,除权票跨期可比)+B8:监测面板价流背离方向阈值改回文档口径±0.3%(原+0.29%也标价弱) ｜0910-39 缩放记忆(ks_zoom_v1)+提醒清空确认闸 ｜0909-38 审计修复:DDX60补klt101显式硬门+ETF短路noFund+周月线DDX文案 ｜0909-37 分钟DDX取不到时补真实日线读数 ｜0909-36撤日线平铺假线">
+<title>K-STATION Mobile · 持仓K线</title><meta name="build" content="ks-0910-41 房主0910凌晨定稿:做T标记改小圆点+当日S1B1序号(撤大三角/价格字/配对箭头糊屏)+选中画线＋提醒常驻线右端(修出现了点不到)+工具栏资金强弱前置/EMA挪后/副图上置挪清空排 ｜0910-40 B5:DDX60分母改官方f57净占比(缺f57才回退量×价估算,除权票跨期可比)+B8:监测面板价流背离方向阈值改回文档口径±0.3%(原+0.29%也标价弱) ｜0910-39 缩放记忆(ks_zoom_v1)+提醒清空确认闸 ｜0909-38 审计修复:DDX60补klt101显式硬门+ETF短路noFund+周月线DDX文案 ｜0909-37 分钟DDX取不到时补真实日线读数 ｜0909-36撤日线平铺假线">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -1169,7 +1169,7 @@ function lineLevelNow(v, im, da) { // 画线在最新K线处的水平值+屏幕Y
   return { val: lv, y: pane ? yOfPane(v, "tqs", lv) : v.Y(lv), kind: pane ? "tqs" : "px" };
 }
 var alBtn = document.getElementById("alBtn"), _alHov = null, _alHideT = 0;
-function alHideLater() { clearTimeout(_alHideT); _alHideT = setTimeout(function () { if (alBtn) { alBtn.style.display = "none"; _alHov = null; } }, 3000); }
+function alHideLater() { clearTimeout(_alHideT); _alHideT = setTimeout(function () { if (alBtn && S.selected < 0) { alBtn.style.display = "none"; _alHov = null; } }, 6000); } // ks-0910-41: 3s→6s;选中画线期间到点也不收(选中常驻语义)
 function cancelAlHide() { clearTimeout(_alHideT); }
 function alTol() { return (alBtn && alBtn.style.display === "block") ? 36 : 14; } // ks-0909-33: 滞回——按钮已弹出时放宽容差,移向按钮(在线上方24px)不会半路收回
 function updAlBtn(px2, py2, sticky) {
@@ -1182,14 +1182,21 @@ function updAlBtn(px2, py2, sticky) {
     var dy = Math.abs(py2 - lv.y);
     if (dy < alTol() && (!best || dy < best.dy)) best = { dy: dy, lv: lv };
   }
+  // ks-0910-41: 选中画线→＋提醒常驻该线右端(房主原话"画线的话旁边得有添加提醒点上")——不靠hover/定时器时序,选中即在、取消选中才收;修"提醒出现了点不到"反复发作
+  if (!best && S.selected >= 0 && dl[S.selected]) {
+    var lv2 = lineLevelNow(v, im, dl[S.selected]);
+    if (lv2) best = { dy: 0, lv: lv2 };
+  }
   if (!best) { if (!sticky) { alBtn.style.display = "none"; _alHov = null; } return; }
   _alHov = best.lv;
   var wr = document.getElementById("chartwrap").getBoundingClientRect(), cr = cv.getBoundingClientRect();
   alBtn.style.display = "block";
   alBtn.style.left = (cr.left - wr.left + v.padL + (v.i1 - v.i0) * v.step - 58) + "px";
   alBtn.style.top = (cr.top - wr.top + best.lv.y - 24) + "px";
-  if (sticky) alHideLater(); // 触屏:按钮粘住3秒,松手不会立刻消失
+  if (sticky) alHideLater(); // 触屏:按钮粘住6秒,松手不会立刻消失
 }
+// ks-0910-41: 选中/取消选中画线后重挂提醒钮(syncTools在选中变化时被调)
+function alSyncSel() { if (alBtn) { cancelAlHide(); updAlBtn(-999, -999, false); } }
 cv.addEventListener("pointermove", function (ev) {
   if (ev.pointerType && ev.pointerType !== "mouse") return;
   if (alBtn && alBtn.style.display === "block") { // ks-0909-33: 光标已在按钮上/边缘→保持,别半路收回
@@ -2359,10 +2366,16 @@ function buildTools() {
       });
     });
     if (dlist().length || swept) { DRAW[dkey()] = []; S.selected = -1; store(); hint(swept ? "本周期画线+各周期价位线已清空" : "本周期画线已清空"); syncTools(); draw(); }
+  }],
+  // ks-0910-41: 副图上置从指标排挪到本排(房主指定"挪到和清空一排")
+  ["副图上置", function () {
+    S.ind.paneTop = !S.ind.paneTop; store(); buildTools(); draw();
+    hint(S.ind.paneTop ? "副图已上置到主图上方" : "副图已回主图下方");
   }]].forEach(function (op) {
     var b = document.createElement("button");
     b.className = "btn warn"; b.type = "button"; b.textContent = op[0];
     if (op[0] === "区间") b.setAttribute("data-rng", "1");
+    if (op[0] === "副图上置" && S.ind.paneTop) b.classList.add("on");
     b.addEventListener("click", op[1]);
     el.appendChild(b);
   });
@@ -2403,6 +2416,7 @@ function syncTools() {
   document.querySelectorAll("[data-rng]").forEach(function (b) {
     b.classList.toggle("on", !!S.rngMode);
   });
+  alSyncSel(); // ks-0910-41: 选中态变化→＋提醒跟随选中线常驻/收起
 }
 function syncTop() {
   var q = S.quote;
@@ -3136,7 +3150,8 @@ function renderTradeMarks(ctx, v, kl, i0, i1) {
   if (!trds || !trds.length) return;
   var tol = (S.klt === "101" || S.klt === "102" || S.klt === "103") ? 0 : Math.max(1, parseInt(S.klt, 10) || 1);
   function mins(ts) { var hm2 = ts.slice(11, 16).split(":"); return (+hm2[0]) * 60 + (+hm2[1]); }
-  var mk = []; // 定位后的点, 供配对画箭头
+  // ks-0910-41 房主定稿: 做T标记只留 小圆点+当日序号(S1/S2/S3·B1/B2/B3,按当天时间顺排)——三角/价格字/配对箭头/涨幅%全撤(太大+粘在一起糊屏,0910 03:33巨石截图实锤,房主原话"别画三角了太大了,就画小点S123B123这么分")
+  var mk = [];
   trds.forEach(function (tr) { // ks-0909-30: 修0907-29回归——上面放行的是trds(urlTrades||localTrades),这里却写死S.urlTrades,纯本地台账时urlTrades=undefined直接抛错,draw保险降级只剩裸K线(画线/副图全灭)
     var D = tr.dt.slice(0, 10), hasT = tr.dt.length > 10;
     var bi = -1, bd = 1e9;
@@ -3151,40 +3166,36 @@ function renderTradeMarks(ctx, v, kl, i0, i1) {
     if (hasT && kl[bi][0].length > 10 && bd > tol) return;
     var x = v.X(bi), yy = v.Y(tr.p);
     if (yy < v.pTop || yy > v.pTop + v.priceH) return;
-    var buy = tr.side === "b";
-    ctx.fillStyle = buy ? "#2ebd7f" : "#f4655f";
-    ctx.beginPath();
-    if (buy) { ctx.moveTo(x, yy + 6); ctx.lineTo(x - 7, yy + 18); ctx.lineTo(x + 7, yy + 18); }
-    else { ctx.moveTo(x, yy - 6); ctx.lineTo(x - 7, yy - 18); ctx.lineTo(x + 7, yy - 18); }
-    ctx.closePath(); ctx.fill();
-    ctx.font = "bold 10px Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText((buy ? "B " : "S ") + tr.p, x, buy ? yy + 30 : yy - 22);
-    mk.push({ x: x, y: yy, p: tr.p, side: tr.side, dt: tr.dt });
+    mk.push({ x: x, y: yy, p: tr.p, side: tr.side, dt: tr.dt, D: D });
   });
-  // 配对涨幅箭头: 按时间相邻的买→卖(正T)/卖→买(反T)连线, 标这一轮的涨幅
+  // 当日序号: 按天+方向分组,组内按时间顺排编号
   mk.sort(function (a, b) { return a.dt < b.dt ? -1 : 1; });
-  var pend = null;
-  mk.forEach(function (m2) {
-    if (!pend) { pend = m2; return; }
-    if (pend.side === m2.side) { pend = m2; return; } // 同向连买/连卖, 以最新为准
-    var bP = pend.side === "b" ? pend.p : m2.p, sP = pend.side === "b" ? m2.p : pend.p;
-    var pc = (sP / bP - 1) * 100;
-    var win = pc >= 0;
-    ctx.strokeStyle = win ? "rgba(255,111,102,0.85)" : "rgba(53,217,154,0.85)";
-    ctx.fillStyle = win ? "#ff6f66" : "#35d99a";
-    ctx.lineWidth = 1.2; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(pend.x, pend.y); ctx.lineTo(m2.x, m2.y); ctx.stroke(); ctx.setLineDash([]);
-    // 箭头头部(小三角, 指向后一笔)
-    var dx = m2.x - pend.x, dy = m2.y - pend.y, L = Math.sqrt(dx * dx + dy * dy) || 1;
-    var ux = dx / L, uy = dy / L, px2 = -uy, py2 = ux;
-    ctx.beginPath();
-    ctx.moveTo(m2.x, m2.y);
-    ctx.lineTo(m2.x - ux * 9 + px2 * 4, m2.y - uy * 9 + py2 * 4);
-    ctx.lineTo(m2.x - ux * 9 - px2 * 4, m2.y - uy * 9 - py2 * 4);
-    ctx.closePath(); ctx.fill();
-    ctx.font = "bold 10px Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText((win ? "+" : "") + pc.toFixed(1) + "%", (pend.x + m2.x) / 2, (pend.y + m2.y) / 2 - 5);
-    pend = null;
+  var seq = {};
+  mk.forEach(function (m0) {
+    var k = m0.D + "|" + m0.side;
+    seq[k] = (seq[k] || 0) + 1;
+    m0.lb = (m0.side === "b" ? "B" : "S") + seq[k];
+  });
+  // 标签纵向错开: x相近(<30px)且y相叠(<10px)顺次下推
+  var lb = mk.map(function (m0) { var buy = m0.side === "b"; return { m: m0, y: buy ? m0.y + 14 : m0.y - 10 }; });
+  lb.sort(function (a, b) { return a.y - b.y; });
+  for (var li = 0; li < lb.length; li++) {
+    var L0 = lb[li];
+    for (var lj = 0; lj < li; lj++) {
+      var L1 = lb[lj];
+      if (Math.abs(L1.m.x - L0.m.x) < 30 && Math.abs(L1.y - L0.y) < 10) { L0.y = L1.y + 10; lj = -1; }
+    }
+  }
+  // 画小圆点(r=3)
+  mk.forEach(function (m0) {
+    ctx.fillStyle = m0.side === "b" ? "#2ebd7f" : "#f4655f";
+    ctx.beginPath(); ctx.arc(m0.x, m0.y, 3, 0, 7); ctx.fill();
+  });
+  // 画序号小字
+  ctx.font = "bold 8px Menlo, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  lb.forEach(function (L0) {
+    ctx.fillStyle = L0.m.side === "b" ? "#2ebd7f" : "#f4655f";
+    ctx.fillText(L0.m.lb, L0.m.x, L0.y);
   });
 }
 // 时间平移按钮: 一下翻1/4屏, 比拖拽省事
@@ -4092,7 +4103,7 @@ function renderExtraPanes(ctx, v) {
   }
 }
 /* ================= 指标开关行 ================= */
-var INDS = [["ma", "EMA"], ["hma", "变色MA"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["macd", "MACD"], ["tqs", "强弱T"], ["ctrl", "资金控盘"], ["zlyy", "主力净额"], ["rtflow", "实时主力"], ["paneTop", "副图上置"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["vp", "量分布"], ["solid", "实线"], ["volMain", "VOL叠加"]]; // ks-0907-22: 资金控盘/主力净额/实时主力/副图上置前移(用户指定)
+var INDS = [["tqs", "强弱T"], ["rtflow", "实时主力"], ["ctrl", "资金控盘"], ["zlyy", "主力净额"], ["macd", "MACD"], ["tsline", "分时线"], ["lr", "回归通道"], ["boll", "BOLL"], ["dsup", "动态撑压"], ["lsr", "实时撑压"], ["fvg", "FVG"], ["liq", "流动性"], ["ms", "结构"], ["ob", "订单块"], ["cost", "成本线"], ["tdhl", "今高低"], ["monitor", "监测"], ["atri", "三角形"], ["vp", "量分布"], ["hma", "变色MA"], ["ma", "EMA"], ["solid", "实线"], ["volMain", "VOL叠加"]]; // ks-0910-41: 房主定稿——资金类(实时主力/控盘/净额)+强弱T前置,EMA挪后;副图上置挪到画线操作排(清空旁),不再占指标位
 /* ---- ★收藏栏(ks-0906-16): 点「＋挑收藏」进入挑选模式, 点工具/指标按钮上的☆即入栏; 取消收藏只从栏里消失,功能本身不关; 栏头可收起 ---- */
 function favName(id) {
   var p2 = id.split(":"), kd = p2[0], ky = p2[1];
