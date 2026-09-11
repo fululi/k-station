@@ -287,6 +287,7 @@ function fetchKlineTX(code, klt, cb) {
       cb(null, txRows(rows), "");
     });
   } else {
+    var kA = klt;
     fetchJSONK("/appstock/app/kline/mkline?param=" + prefix + ",m" + kA + ",,320", function (err, d) {
       var sd = d && d.data && d.data[prefix];
       var rows = sd && sd["m" + kA];
@@ -2490,7 +2491,6 @@ function loadAll(reset) {
     hint("");
     setFresh(true);
     syncTop(); draw();
-    triScanAll();
   });
   fetchQuote(S.active, function (err, q) {
     if (!err && q) {
